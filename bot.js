@@ -627,7 +627,7 @@ function buildDoctorSelectionMessage(especialidad, includeManuel = false) {
 
 const client = new Client({
   authStrategy: new LocalAuth({
-    dataPath: process.env.SESSION_PATH || "./.wwebjs_auth",
+    dataPath: "./.wwebjs_auth",
   }),
   puppeteer: {
     headless: true,
