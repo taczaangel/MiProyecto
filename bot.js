@@ -626,8 +626,21 @@ function buildDoctorSelectionMessage(especialidad, includeManuel = false) {
 }
 
 const client = new Client({
-  authStrategy: new LocalAuth(),
-  puppeteer: { headless: true },
+  authStrategy: new LocalAuth({
+    dataPath: process.env.SESSION_PATH || "./.wwebjs_auth",
+  }),
+  puppeteer: {
+    headless: true,
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-accelerated-2d-canvas",
+      "--no-first-run",
+      "--no-zygote",
+      "--disable-gpu",
+    ],
+  },
 });
 
 client.on("qr", (qr) => qrcode.generate(qr, { small: true }));
