@@ -7,8 +7,7 @@ const axios = require("axios");
 const TURNOS_FILE = path.join(__dirname, "turnos.json");
 const CITAS_FILE = path.join(__dirname, "citas.json");
 const ADMIN_PHONE = "51959634347@c.us";
-const SERVER_URL =
-  process.env.SERVER_URL || `http://localhost:${process.env.PORT || 3000}`;
+const SERVER_URL = process.env.SERVER_URL || "http://localhost:3000";
 
 let turnosCache = [];
 let pollingInterval = null;
@@ -1781,5 +1780,3 @@ if (require.main === module) {
   client.initialize();
   console.log("🤖 BOT INICIANDO...");
 }
-
-
