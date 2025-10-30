@@ -1,0 +1,25 @@
+{
+  "name": "mi-proyecto-bot",
+  "version": "1.0.0",
+  "description": "Bot WhatsApp para citas",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^5.0.4",
+    "axios": "^1.6.0",
+    "csv-writer": "^1.6.0",
+    "dotenv": "^17.2.3",
+    "express": "^4.18.0",
+    "framer-motion": "^12.23.22",
+    "googleapis": "^161.0.0",
+    "node-fetch": "^3.3.2",
+    "ollama": "^0.6.0",
+    "qrcode-terminal": "^0.12.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "vite": "^7.1.9",
+    "whatsapp-web.js": "^1.23.0"
+  }
+}

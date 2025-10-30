@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Panel de Gestión de Turnos - Semanal Profesional</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="contenedor-principal">
+      <header class="header">
+        <h1>Gestión de Turnos Dentales</h1>
+        <p class="subtitle">Planifica la semana con precisión profesional</p>
+      </header>
+
+      <!-- Barra de controles mejorada -->
+      <div class="controles-bar">
+        <div class="control-group">
+          <label for="selectProfesional" class="label-pro">Profesional:</label>
+          <select id="selectProfesional" class="select-pro">
+            <option value="">Selecciona un profesional</option>
+            <option value="elio">Elio Támara (General)</option>
+            <option value="manuel">Manuel Romani (General)</option>
+            <option value="jimy">Jimy Osorio (Pediatría)</option>
+            <!-- ✅ FERNANDO AÑADIDO -->
+            <option value="fernando">Fernando Bustamante (Pediatría)</option>
+          </select>
+          <div id="mensajeTemporal" class="mensaje-temporal"></div>
+        </div>
+
+        <div class="botones-grupo">
+          <button
+            id="btnModoBorrar"
+            class="btn btn-secundario"
+            title="Activar modo borrado individual"
+          >
+            <span class="btn-icon">🗑️</span> Modo Borrar
+          </button>
+          <button
+            id="btnGuardar"
+            class="btn btn-primario"
+            title="Guardar todos los cambios en el servidor"
+          >
+            <span class="btn-icon">💾</span> Guardar
+          </button>
+          <button
+            id="btnBorrar"
+            class="btn btn-danger"
+            title="Borrar todos los turnos del profesional seleccionado"
+          >
+            <span class="btn-icon">🚫</span> Borrar Todos
+          </button>
+        </div>
+      </div>
+
+      <!-- Panel de calendario (tabla) -->
+      <main id="calendar" class="calendar-container"></main>
+    </div>
+
+    <!-- Modal de Confirmación (simple y profesional) -->
+    <div id="modalConfirm" class="modal-overlay">
+      <div class="modal-content">
+        <h3 id="modalTitle">Confirmar Acción</h3>
+        <p id="modalMessage"></p>
+        <div class="modal-buttons">
+          <button id="modalConfirmBtn" class="btn btn-primario">
+            Confirmar
+          </button>
+          <button id="modalCancelBtn" class="btn btn-secundario">
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>

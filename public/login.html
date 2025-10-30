@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Login - Clínica Dental</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+      }
+
+      .container {
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        overflow: hidden;
+        max-width: 900px;
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .dental-side {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        padding: 60px 40px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        color: white;
+        position: relative;
+      }
+
+      /* Ojo animado */
+      .eye-container {
+        position: relative;
+        width: 200px;
+        height: 120px;
+        margin-bottom: 30px;
+      }
+
+      .eye {
+        position: absolute;
+        width: 120px;
+        height: 120px;
+        background: white;
+        border-radius: 50%;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        overflow: hidden;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+        transition: height 0.3s ease;
+      }
+
+      .eye.closed {
+        height: 10px;
+        border-radius: 60px;
+      }
+
+      .iris {
+        position: absolute;
+        width: 60px;
+        height: 60px;
+        background: radial-gradient(circle at 35% 35%, #4facfe, #0066cc);
+        border-radius: 50%;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        transition: all 0.1s ease;
+      }
+
+      .pupil {
+        position: absolute;
+        width: 30px;
+        height: 30px;
+        background: #000;
+        border-radius: 50%;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+      }
+
+      .highlight {
+        position: absolute;
+        width: 12px;
+        height: 12px;
+        background: white;
+        border-radius: 50%;
+        top: 8px;
+        left: 8px;
+      }
+
+      .eyelid-top,
+      .eyelid-bottom {
+        position: absolute;
+        width: 100%;
+        height: 50%;
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        left: 0;
+        transition: transform 0.3s ease;
+      }
+
+      .eyelid-top {
+        top: 0;
+        border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+        transform: translateY(-100%);
+      }
+
+      .eyelid-bottom {
+        bottom: 0;
+        border-top: 2px solid rgba(255, 255, 255, 0.3);
+        transform: translateY(100%);
+      }
+
+      .eye.closed .eyelid-top {
+        transform: translateY(0);
+      }
+
+      .eye.closed .eyelid-bottom {
+        transform: translateY(0);
+      }
+
+      .dental-side h2 {
+        font-size: 28px;
+        margin-bottom: 15px;
+        text-align: center;
+      }
+
+      .dental-side p {
+        text-align: center;
+        font-size: 16px;
+        opacity: 0.9;
+      }
+
+      .login-side {
+        padding: 60px 50px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+
+      h1 {
+        color: #333;
+        font-size: 32px;
+        margin-bottom: 10px;
+      }
+
+      .subtitle {
+        color: #666;
+        margin-bottom: 40px;
+        font-size: 14px;
+      }
+
+      form {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .form-group {
+        margin-bottom: 25px;
+      }
+
+      label {
+        display: block;
+        color: #555;
+        font-weight: 600;
+        margin-bottom: 8px;
+        font-size: 14px;
+      }
+
+      input {
+        width: 100%;
+        padding: 14px 18px;
+        border: 2px solid #e0e0e0;
+        border-radius: 10px;
+        font-size: 15px;
+        transition: all 0.3s ease;
+        background: #f8f9fa;
+      }
+
+      input:focus {
+        outline: none;
+        border-color: #4facfe;
+        background: white;
+        box-shadow: 0 0 0 3px rgba(79, 172, 254, 0.1);
+      }
+
+      button {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        color: white;
+        border: none;
+        padding: 16px;
+        border-radius: 10px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        margin-top: 10px;
+        box-shadow: 0 4px 15px rgba(79, 172, 254, 0.4);
+      }
+
+      button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(79, 172, 254, 0.6);
+      }
+
+      button:active {
+        transform: translateY(0);
+      }
+
+      .sparkle {
+        position: absolute;
+        width: 4px;
+        height: 4px;
+        background: white;
+        border-radius: 50%;
+        animation: sparkle 2s ease-in-out infinite;
+      }
+
+      @keyframes sparkle {
+        0%,
+        100% {
+          opacity: 0;
+          transform: scale(0);
+        }
+        50% {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+
+      .sparkle:nth-child(1) {
+        top: 20%;
+        left: 20%;
+        animation-delay: 0s;
+      }
+      .sparkle:nth-child(2) {
+        top: 40%;
+        right: 25%;
+        animation-delay: 0.5s;
+      }
+      .sparkle:nth-child(3) {
+        bottom: 30%;
+        left: 30%;
+        animation-delay: 1s;
+      }
+      .sparkle:nth-child(4) {
+        top: 60%;
+        right: 20%;
+        animation-delay: 1.5s;
+      }
+
+      @media (max-width: 768px) {
+        .container {
+          grid-template-columns: 1fr;
+        }
+
+        .dental-side {
+          padding: 40px 30px;
+        }
+
+        .eye-container {
+          width: 150px;
+          height: 90px;
+        }
+
+        .eye {
+          width: 90px;
+          height: 90px;
+        }
+
+        .iris {
+          width: 45px;
+          height: 45px;
+        }
+
+        .pupil {
+          width: 22px;
+          height: 22px;
+        }
+
+        .login-side {
+          padding: 40px 30px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="dental-side">
+        <div class="sparkle"></div>
+        <div class="sparkle"></div>
+        <div class="sparkle"></div>
+        <div class="sparkle"></div>
+
+        <div class="eye-container">
+          <div class="eye" id="eye">
+            <div class="eyelid-top"></div>
+            <div class="iris" id="iris">
+              <div class="pupil">
+                <div class="highlight"></div>
+              </div>
+            </div>
+            <div class="eyelid-bottom"></div>
+          </div>
+        </div>
+
+        <p>CENTRO DE SALUD SAN RAMÓN</p>
+
+        <h2>SERVICIO DE ODONTOLOGÍA</h2>
+      </div>
+
+      <div class="login-side">
+        <h1>Iniciar sesión</h1>
+        <p class="subtitle">Accede a tu panel de control</p>
+
+        <form method="POST" action="/login">
+          <div class="form-group">
+            <label>Usuario:</label>
+            <input
+              type="text"
+              name="username"
+              id="username"
+              required
+              placeholder="Ingresa tu usuario"
+            />
+          </div>
+
+          <div class="form-group">
+            <label>Contraseña:</label>
+            <input
+              type="password"
+              name="password"
+              id="password"
+              required
+              placeholder="Ingresa tu contraseña"
+            />
+          </div>
+
+          <button type="submit">Ingresar</button>
+        </form>
+      </div>
+    </div>
+
+    <script>
+      const eye = document.getElementById("eye");
+      const iris = document.getElementById("iris");
+      const passwordInput = document.getElementById("password");
+      const usernameInput = document.getElementById("username");
+      const loginSide = document.querySelector(".login-side");
+
+      // Seguir el movimiento del mouse
+      loginSide.addEventListener("mousemove", (e) => {
+        if (!passwordInput.matches(":focus")) {
+          const rect = eye.getBoundingClientRect();
+          const eyeCenterX = rect.left + rect.width / 2;
+          const eyeCenterY = rect.top + rect.height / 2;
+
+          const deltaX = e.clientX - eyeCenterX;
+          const deltaY = e.clientY - eyeCenterY;
+
+          const angle = Math.atan2(deltaY, deltaX);
+          const distance = Math.min(
+            Math.sqrt(deltaX ** 2 + deltaY ** 2) / 10,
+            20
+          );
+
+          const irisX = Math.cos(angle) * distance;
+          const irisY = Math.sin(angle) * distance;
+
+          iris.style.transform = `translate(calc(-50% + ${irisX}px), calc(-50% + ${irisY}px))`;
+        }
+      });
+
+      // Seguir el cursor cuando escribes
+      usernameInput.addEventListener("input", () => {
+        const rect = usernameInput.getBoundingClientRect();
+        const eyeRect = eye.getBoundingClientRect();
+
+        const eyeCenterX = eyeRect.left + eyeRect.width / 2;
+        const eyeCenterY = eyeRect.top + eyeRect.height / 2;
+        const inputCenterX = rect.left + rect.width / 2;
+        const inputCenterY = rect.top + rect.height / 2;
+
+        const deltaX = inputCenterX - eyeCenterX;
+        const deltaY = inputCenterY - eyeCenterY;
+
+        const angle = Math.atan2(deltaY, deltaX);
+        const distance = 20;
+
+        const irisX = Math.cos(angle) * distance;
+        const irisY = Math.sin(angle) * distance;
+
+        iris.style.transform = `translate(calc(-50% + ${irisX}px), calc(-50% + ${irisY}px))`;
+      });
+
+      // Cerrar ojos cuando escribes contraseña
+      passwordInput.addEventListener("focus", () => {
+        eye.classList.add("closed");
+      });
+
+      passwordInput.addEventListener("blur", () => {
+        eye.classList.remove("closed");
+      });
+
+      // Centrar la pupila cuando no hay movimiento
+      loginSide.addEventListener("mouseleave", () => {
+        iris.style.transform = "translate(-50%, -50%)";
+      });
+    </script>
+  </body>
+</html>
