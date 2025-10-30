@@ -4,7 +4,7 @@
   "description": "Bot WhatsApp para citas",
   "main": "bot.js",
   "scripts": {
-    "start": "node start.js"
+    "start": "concurrently \"node server.js\" \"node bot.js\""
   },
   "dependencies": {
     "@vitejs/plugin-react": "^5.0.4",
