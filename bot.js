@@ -673,19 +673,6 @@ client.on("message", async (msg) => {
 
     const chatId = msg.from;
 
-    // ✅ PERMITIR SIEMPRE AL ADMIN
-    if (chatId === ADMIN_PHONE) {
-      console.log("📞 Mensaje del admin, sin restricciones de horario");
-    } else {
-      // ⏰ VERIFICAR HORARIO PARA USUARIOS NORMALES
-      if (!isFridayActiveHours()) {
-        console.log(
-          `⏰ Mensaje fuera de horario desde ${chatId} - NO SE RESPONDE`
-        );
-        return; // NO responde nada, simplemente ignora el mensaje
-      }
-    }
-
     const raw = (msg.body || "").trim();
     if (!raw) return;
 
@@ -1714,59 +1701,6 @@ async function handleChangeRequest(chatId, state) {
   } else {
     state.step = 6;
   }
-}
-
-// ========== FUNCIONES DE HORARIO ==========
-function getCurrentPeruTime() {
-  // UTC-5 para Perú
-  const now = new Date();
-  const peruTime = new Date(now.getTime() - 5 * 60 * 60 * 1000);
-  return peruTime;
-}
-
-// REEMPLAZA TODA LA FUNCIÓN isFridayActiveHours():
-function isFridayActiveHours() {
-  const peruTime = getCurrentPeruTime();
-  const dayOfWeek = peruTime.getUTCDay(); // 5 = viernes
-  const hours = peruTime.getUTCHours();
-  const minutes = peruTime.getUTCMinutes();
-
-  // Si NO es viernes, retorna false
-  if (dayOfWeek !== 5) return false;
-
-  // Si ES viernes, verifica el horario (7:30 AM - 11:00 AM)
-  const currentTimeInMinutes = hours * 60 + minutes;
-  const startTime = 7 * 60 + 30; // 7:30 AM
-  const endTime = 11 * 60; // 11:00 AM
-
-  return currentTimeInMinutes >= startTime && currentTimeInMinutes < endTime;
-}
-
-// REEMPLAZA TODA LA FUNCIÓN getOutOfHoursMessage():
-function getOutOfHoursMessage() {
-  const peruTime = getCurrentPeruTime();
-  const dayOfWeek = peruTime.getUTCDay(); // 0=domingo, 1=lunes, ... 5=viernes
-  const hours = peruTime.getUTCHours();
-  const minutes = peruTime.getUTCMinutes();
-  const currentTimeInMinutes = hours * 60 + minutes;
-  const startTime = 7 * 60 + 30; // 7:30 AM
-  const endTime = 11 * 60; // 11:00 AM
-
-  // ===== CASO 1: ES VIERNES =====
-  if (dayOfWeek === 5) {
-    // Viernes ANTES de las 7:30 AM
-    if (currentTimeInMinutes < startTime) {
-      return "Buenos días, escríbanos por favor en nuestro horario de atención exactamente a las *7:30 a. m.* ⏰";
-    }
-
-    // Viernes DESPUÉS de las 11:00 AM
-    if (currentTimeInMinutes >= endTime) {
-      return "Los cupos de atención ya se agotaron para hoy. 😔\n\nPor favor, escríbenos el próximo *viernes a partir de las 7:30 a. m.* 📅";
-    }
-  }
-
-  // ===== CASO 2: NO ES VIERNES (sábado, domingo, lunes, martes, miércoles, jueves) =====
-  return "Las citas se asignan únicamente los días *viernes desde las 7:30 a. m. hasta las 11:00 a. m.* 📅⏰\n\nPor favor, escríbenos el próximo viernes en ese horario.";
 }
 
 // AL FINAL DE bot.js, CAMBIA ESTO:

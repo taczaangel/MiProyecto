@@ -21,19 +21,36 @@ server.on("close", (code) => {
   process.exit(code);
 });
 
-// Variable para el proceso del bot
+// ====== BOT AUTO-RESPONDER (24/7) ======
+console.log("🤖 Iniciando bot auto-responder (24/7)...");
+const autoResponder = spawn("node", ["bot-autoresponder.js"], {
+  env: { ...process.env },
+});
+
+autoResponder.stdout.on("data", (data) => {
+  console.log(`[AUTO-RESPONDER] ${data}`);
+});
+
+autoResponder.stderr.on("data", (data) => {
+  console.error(`[AUTO-RESPONDER ERROR] ${data}`);
+});
+
+autoResponder.on("close", (code) => {
+  console.log(`[AUTO-RESPONDER] Proceso terminado con código ${code}`);
+});
+
+// ====== BOT PRINCIPAL (Solo viernes 7:30-11:00 AM) ======
 let botProcess = null;
 
-// Función para verificar si es viernes 7:30-11:00 AM hora de Perú
 function shouldBotBeRunning() {
   const now = new Date();
   const peruTime = new Date(now.getTime() - 5 * 60 * 60 * 1000);
-  const dayOfWeek = peruTime.getUTCDay(); // 5 = viernes
+  const dayOfWeek = peruTime.getUTCDay();
   const hours = peruTime.getUTCHours();
   const minutes = peruTime.getUTCMinutes();
   const currentTimeInMinutes = hours * 60 + minutes;
-  const startTime = 7 * 60 + 30; // 7:30 AM
-  const endTime = 11 * 60; // 11:00 AM
+  const startTime = 7 * 60 + 30;
+  const endTime = 11 * 60;
 
   return (
     dayOfWeek === 5 &&
@@ -42,65 +59,63 @@ function shouldBotBeRunning() {
   );
 }
 
-// Función para iniciar el bot
 function startBot() {
   if (botProcess) {
-    console.log("⚠️ Bot ya está corriendo");
+    console.log("⚠️ Bot principal ya está corriendo");
     return;
   }
 
-  console.log("🤖 INICIANDO BOT DE WHATSAPP...");
+  console.log("🤖 INICIANDO BOT PRINCIPAL (Reservas)...");
   botProcess = spawn("node", ["bot.js"], {
     env: { ...process.env, SERVER_URL: `http://localhost:${PORT}` },
   });
 
   botProcess.stdout.on("data", (data) => {
-    console.log(`[BOT] ${data}`);
+    console.log(`[BOT-PRINCIPAL] ${data}`);
   });
 
   botProcess.stderr.on("data", (data) => {
-    console.error(`[BOT ERROR] ${data}`);
+    console.error(`[BOT-PRINCIPAL ERROR] ${data}`);
   });
 
   botProcess.on("close", (code) => {
-    console.log(`[BOT] Proceso terminado con código ${code}`);
+    console.log(`[BOT-PRINCIPAL] Proceso terminado con código ${code}`);
     botProcess = null;
   });
 }
 
-// Función para detener el bot
 function stopBot() {
   if (!botProcess) {
-    console.log("⚠️ Bot no está corriendo");
+    console.log("⚠️ Bot principal no está corriendo");
     return;
   }
 
-  console.log("🛑 DETENIENDO BOT DE WHATSAPP...");
+  console.log("🛑 DETENIENDO BOT PRINCIPAL...");
   botProcess.kill();
   botProcess = null;
 }
 
-// Verificar cada minuto si el bot debe estar corriendo
 setInterval(() => {
   const shouldRun = shouldBotBeRunning();
   const isRunning = botProcess !== null;
 
   if (shouldRun && !isRunning) {
-    console.log("✅ Es hora de iniciar el bot (Viernes 7:30-11:00 AM)");
+    console.log(
+      "✅ Es hora de iniciar el bot principal (Viernes 7:30-11:00 AM)"
+    );
     startBot();
   } else if (!shouldRun && isRunning) {
-    console.log("🔴 Fuera de horario, deteniendo bot...");
+    console.log("🔴 Fuera de horario, deteniendo bot principal...");
     stopBot();
   }
-}, 60000); // Cada 1 minuto
+}, 60000);
 
-// Verificar inmediatamente al iniciar
-console.log("⏰ Verificando si el bot debe estar corriendo...");
+console.log("⏰ Verificando si el bot principal debe estar corriendo...");
 if (shouldBotBeRunning()) {
-  console.log("✅ Horario válido, iniciando bot...");
+  console.log("✅ Horario válido, iniciando bot principal...");
   startBot();
 } else {
   console.log(
-    "🔴 Fuera de horario, bot NO se iniciará hasta el viernes 7:30 AM"
+    "🔴 Fuera de horario, bot principal NO se iniciará hasta el viernes 7:30 AM"
   );
 }
