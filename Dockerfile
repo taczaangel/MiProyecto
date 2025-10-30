@@ -1,6 +1,5 @@
-FROM node:18-bullseye
+﻿FROM node:18-bullseye
 
-# Instalar dependencias necesarias para Puppeteer/Chromium
 RUN apt-get update && apt-get install -y \
     wget \
     ca-certificates \
@@ -27,41 +26,14 @@ RUN apt-get update && apt-get install -y \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
-# Establecer directorio de trabajo
 WORKDIR /app
 
-# Copiar package.json y package-lock.json
 COPY package*.json ./
 
-# Instalar dependencias de Node.js
 RUN npm install
 
-# Copiar el resto del código
 COPY . .
 
-# Exponer puerto
 EXPOSE 8080
 
-# Comando de inicio
 CMD ["npm", "start"]
-```
-
-**Guarda el archivo.**
-
----
-
-## 📋 PASO 3: Crear archivo .dockerignore
-
-Crea otro archivo llamado:
-```
-.dockerignore
-```
-
-Y pega esto dentro:
-```
-node_modules
-.wwebjs_auth
-.wwebjs_cache
-.git
-.gitignore
-*.log
