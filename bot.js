@@ -679,10 +679,10 @@ client.on("message", async (msg) => {
     } else {
       // ⏰ VERIFICAR HORARIO PARA USUARIOS NORMALES
       if (!isFridayActiveHours()) {
-        const outOfHoursMsg = getOutOfHoursMessage();
-        await client.sendMessage(chatId, outOfHoursMsg);
-        console.log(`⏰ Mensaje fuera de horario desde ${chatId}`);
-        return; // Detiene la ejecución aquí ← AQUÍ SE DETIENE TODO
+        console.log(
+          `⏰ Mensaje fuera de horario desde ${chatId} - NO SE RESPONDE`
+        );
+        return; // NO responde nada, simplemente ignora el mensaje
       }
     }
 
