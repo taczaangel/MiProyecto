@@ -673,7 +673,6 @@ client.on("message", async (msg) => {
 
     // ✅ PERMITIR SIEMPRE AL ADMIN
     if (chatId === ADMIN_PHONE) {
-      // El admin puede usar el bot siempre, continúa normalmente
       console.log("📞 Mensaje del admin, sin restricciones de horario");
     } else {
       // ⏰ VERIFICAR HORARIO PARA USUARIOS NORMALES
@@ -681,7 +680,7 @@ client.on("message", async (msg) => {
         const outOfHoursMsg = getOutOfHoursMessage();
         await client.sendMessage(chatId, outOfHoursMsg);
         console.log(`⏰ Mensaje fuera de horario desde ${chatId}`);
-        return; // Detiene la ejecución aquí
+        return; // Detiene la ejecución aquí ← AQUÍ SE DETIENE TODO
       }
     }
 
@@ -706,6 +705,7 @@ client.on("message", async (msg) => {
             chatId,
             "Lo sentimos 😔, actualmente *no hay turnos disponibles*.\n\nLas citas se liberan todos los *viernes a las 7:30 AM* 🕢. Por favor, escríbenos en ese horario para reservar tu cita. 📅"
           );
+          resetFlow(chatId);
           state.processing = false;
           return;
         }
@@ -729,6 +729,7 @@ client.on("message", async (msg) => {
           return;
         }
       }
+
       if (isGreeting(text)) {
         await fetchTurnosFromServer();
         if (turnosCache.length === 0) {
@@ -736,6 +737,7 @@ client.on("message", async (msg) => {
             chatId,
             "👋 Hola — Lo sentimos 😔, actualmente *no hay turnos disponibles*.\n\nLas citas se liberan todos los *viernes a las 7:30 AM* 🕢. Por favor, escríbenos en ese horario para reservar tu cita. 📅"
           );
+          resetFlow(chatId);
           state.processing = false;
           return;
         }
@@ -753,6 +755,7 @@ client.on("message", async (msg) => {
         state.processing = false;
         return;
       }
+
       state.processing = false;
       return;
     }
