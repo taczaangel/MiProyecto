@@ -1719,43 +1719,49 @@ function getCurrentPeruTime() {
   return peruTime;
 }
 
+// REEMPLAZA TODA LA FUNCIÓN isFridayActiveHours():
 function isFridayActiveHours() {
   const peruTime = getCurrentPeruTime();
   const dayOfWeek = peruTime.getUTCDay(); // 5 = viernes
   const hours = peruTime.getUTCHours();
   const minutes = peruTime.getUTCMinutes();
 
-  // Verifica si es viernes (día 5)
+  // Si NO es viernes, retorna false
   if (dayOfWeek !== 5) return false;
 
-  // Verifica si está entre 7:30 y 11:00
+  // Si ES viernes, verifica el horario (7:30 AM - 11:00 AM)
   const currentTimeInMinutes = hours * 60 + minutes;
-  const startTime = 7 * 60 + 30; // 7:30 AM = 450 minutos
-  const endTime = 11 * 60; // 11:00 AM = 660 minutos
+  const startTime = 7 * 60 + 30; // 7:30 AM
+  const endTime = 11 * 60; // 11:00 AM
 
   return currentTimeInMinutes >= startTime && currentTimeInMinutes < endTime;
 }
 
+// REEMPLAZA TODA LA FUNCIÓN getOutOfHoursMessage():
 function getOutOfHoursMessage() {
   const peruTime = getCurrentPeruTime();
-  const dayOfWeek = peruTime.getUTCDay();
+  const dayOfWeek = peruTime.getUTCDay(); // 0=domingo, 1=lunes, ... 5=viernes
   const hours = peruTime.getUTCHours();
   const minutes = peruTime.getUTCMinutes();
   const currentTimeInMinutes = hours * 60 + minutes;
-  const startTime = 7 * 60 + 30;
+  const startTime = 7 * 60 + 30; // 7:30 AM
+  const endTime = 11 * 60; // 11:00 AM
 
-  // Viernes antes de las 7:30 AM
-  if (dayOfWeek === 5 && currentTimeInMinutes < startTime) {
-    return "Buenos días, escríbanos por favor en nuestro horario de atención exactamente a las *7:30 a. m.* ⏰";
+  // ===== CASO 1: ES VIERNES =====
+  if (dayOfWeek === 5) {
+    // Viernes ANTES de las 7:30 AM
+    if (currentTimeInMinutes < startTime) {
+      return "Buenos días, escríbanos por favor en nuestro horario de atención exactamente a las *7:30 a. m.* ⏰";
+    }
+
+    // Viernes DESPUÉS de las 11:00 AM
+    if (currentTimeInMinutes >= endTime) {
+      return "Los cupos de atención ya se agotaron para hoy. 😔\n\nPor favor, escríbenos el próximo *viernes a partir de las 7:30 a. m.* 📅";
+    }
   }
 
-  // Viernes después de las 11:00 AM
-  if (dayOfWeek === 5 && currentTimeInMinutes >= 11 * 60) {
-    return "Los cupos de atención ya se agotaron. 😔\n\nPor favor, escríbenos el próximo *viernes a partir de las 7:30 a. m.* 📅";
-  }
-
-  // Cualquier otro día (sábado a jueves)
-  return "Las citas se asignan únicamente los días *viernes desde las 7:30 a. m.* 📅⏰";
+  // ===== CASO 2: NO ES VIERNES (sábado, domingo, lunes, martes, miércoles, jueves) =====
+  return "Las citas se asignan únicamente los días *viernes desde las 7:30 a. m. hasta las 11:00 a. m.* 📅⏰\n\nPor favor, escríbenos el próximo viernes en ese horario.";
 }
 
 const BOT_START_TS = Math.floor(Date.now() / 1000);
