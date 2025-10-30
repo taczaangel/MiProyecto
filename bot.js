@@ -9,6 +9,8 @@ const CITAS_FILE = path.join(__dirname, "citas.json");
 const ADMIN_PHONE = "51959634347@c.us";
 const SERVER_URL = process.env.SERVER_URL || "http://localhost:3000";
 
+const BOT_START_TS = Math.floor(Date.now() / 1000); // ← MUEVE ESTA LÍNEA AQUÍ
+
 let turnosCache = [];
 let pollingInterval = null;
 
