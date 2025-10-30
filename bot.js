@@ -11,6 +11,56 @@ const SERVER_URL = process.env.SERVER_URL || "http://localhost:3000";
 
 const BOT_START_TS = Math.floor(Date.now() / 1000); // ← MUEVE ESTA LÍNEA AQUÍ
 
+// ========== FUNCIONES DE HORARIO ==========
+function getCurrentPeruTime() {
+  const now = new Date();
+  const peruTime = new Date(now.getTime() - 5 * 60 * 60 * 1000);
+  return peruTime;
+}
+
+function isFridayActiveHours() {
+  const peruTime = getCurrentPeruTime();
+  const dayOfWeek = peruTime.getUTCDay();
+  const hours = peruTime.getUTCHours();
+  const minutes = peruTime.getUTCMinutes();
+
+  if (dayOfWeek !== 5) return false;
+
+  const currentTimeInMinutes = hours * 60 + minutes;
+  const startTime = 7 * 60 + 30;
+  const endTime = 11 * 60;
+
+  return currentTimeInMinutes >= startTime && currentTimeInMinutes < endTime;
+}
+
+function getAutoResponseMessage() {
+  const peruTime = getCurrentPeruTime();
+  const dayOfWeek = peruTime.getUTCDay();
+  const hours = peruTime.getUTCHours();
+  const minutes = peruTime.getUTCMinutes();
+  const currentTimeInMinutes = hours * 60 + minutes;
+  const startTime = 7 * 60 + 30;
+  const endTime = 11 * 60;
+
+  if (
+    dayOfWeek === 5 &&
+    currentTimeInMinutes >= startTime &&
+    currentTimeInMinutes < endTime
+  ) {
+    return null;
+  }
+
+  if (dayOfWeek === 5 && currentTimeInMinutes < startTime) {
+    return "Buenos días, escríbanos por favor en nuestro horario de atención exactamente a las *7:30 a. m.* ⏰";
+  }
+
+  if (dayOfWeek === 5 && currentTimeInMinutes >= endTime) {
+    return "Los cupos de atención ya se agotaron para hoy. 😔\n\nPor favor, escríbenos el próximo *viernes a partir de las 7:30 a. m.* 📅";
+  }
+
+  return "Las citas se asignan únicamente los días *viernes desde las 7:30 a. m. hasta las 11:00 a. m.* 📅⏰\n\nPor favor, escríbenos el próximo viernes en ese horario.";
+}
+
 let turnosCache = [];
 let pollingInterval = null;
 
@@ -672,6 +722,22 @@ client.on("message", async (msg) => {
     if (msg.timestamp < BOT_START_TS) return;
 
     const chatId = msg.from;
+
+    // ✅ ADMIN puede usar bot siempre
+    const isAdmin = chatId === ADMIN_PHONE;
+
+    // ⏰ Verificar horario activo
+    if (!isAdmin && !isFridayActiveHours()) {
+      const autoResponse = getAutoResponseMessage();
+      if (autoResponse) {
+        await client.sendMessage(chatId, autoResponse);
+        console.log(`📨 Auto-respuesta enviada a ${chatId}`);
+      }
+      return; // Detener procesamiento
+    }
+
+    // ✅ Este bot SOLO funciona viernes 7:30-11:00 AM
+    // Fuera de ese horario NO responde NADA (lo maneja bot-autoresponder)
 
     const raw = (msg.body || "").trim();
     if (!raw) return;

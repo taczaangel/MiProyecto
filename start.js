@@ -21,24 +21,6 @@ server.on("close", (code) => {
   process.exit(code);
 });
 
-// ====== BOT AUTO-RESPONDER (24/7) ======
-console.log("🤖 Iniciando bot auto-responder (24/7)...");
-const autoResponder = spawn("node", ["bot-autoresponder.js"], {
-  env: { ...process.env },
-});
-
-autoResponder.stdout.on("data", (data) => {
-  console.log(`[AUTO-RESPONDER] ${data}`);
-});
-
-autoResponder.stderr.on("data", (data) => {
-  console.error(`[AUTO-RESPONDER ERROR] ${data}`);
-});
-
-autoResponder.on("close", (code) => {
-  console.log(`[AUTO-RESPONDER] Proceso terminado con código ${code}`);
-});
-
 // ====== BOT PRINCIPAL (Solo viernes 7:30-11:00 AM) ======
 let botProcess = null;
 
