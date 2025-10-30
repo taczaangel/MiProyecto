@@ -6,7 +6,6 @@ const users = require("./users");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
@@ -619,3 +618,13 @@ app.listen(PORT, () => {
   console.log(`📄 Archivos: turnos.json y citas.json listos para uso.`);
 });
 
+app.listen(PORT, () => {
+  console.log(`✅ Servidor corriendo en http://localhost:${PORT}`);
+  console.log(`📄 Archivos: turnos.json y citas.json listos para uso.`);
+
+  // 🔥 INICIA EL BOT DESPUÉS DEL SERVIDOR
+  setTimeout(() => {
+    console.log("🤖 Iniciando bot de WhatsApp...");
+    require("./bot.js");
+  }, 3000);
+});

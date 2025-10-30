@@ -7,7 +7,8 @@ const axios = require("axios");
 const TURNOS_FILE = path.join(__dirname, "turnos.json");
 const CITAS_FILE = path.join(__dirname, "citas.json");
 const ADMIN_PHONE = "51959634347@c.us";
-const SERVER_URL = "http://localhost:3000";
+const SERVER_URL =
+  process.env.SERVER_URL || `http://localhost:${process.env.PORT || 3000}`;
 
 let turnosCache = [];
 let pollingInterval = null;
@@ -1764,8 +1765,21 @@ function getOutOfHoursMessage() {
   return "Las citas se asignan únicamente los días *viernes desde las 7:30 a. m. hasta las 11:00 a. m.* 📅⏰\n\nPor favor, escríbenos el próximo viernes en ese horario.";
 }
 
-const BOT_START_TS = Math.floor(Date.now() / 1000);
+// AL FINAL DE bot.js, CAMBIA ESTO:
+// client.initialize();
+// console.log("🤖 BOT INICIANDO...");
 
-client.initialize();
+// POR ESTO:
+// No inicializar aquí, lo hace server.js
+if (require.main === module) {
+  // Solo si se ejecuta directamente (node bot.js)
+  client.initialize();
+  console.log("🤖 BOT INICIANDO STANDALONE...");
+} else {
+  // Si se importa desde server.js
+  console.log("🤖 Bot cargado desde server.js");
+  client.initialize();
+  console.log("🤖 BOT INICIANDO...");
+}
 
-console.log("🤖 BOT INICIANDO...");
+
