@@ -35,30 +35,58 @@ function isFridayActiveHours() {
 
 function getAutoResponseMessage() {
   const peruTime = getCurrentPeruTime();
-  const dayOfWeek = peruTime.getUTCDay();
+  const dayOfWeek = peruTime.getUTCDay(); // 0=Dom, 1=Lun, 2=Mar, 3=Mié, 4=Jue, 5=Vie, 6=Sáb
   const hours = peruTime.getUTCHours();
-  const minutes = peruTime.getUTCMinutes();
-  const currentTimeInMinutes = hours * 60 + minutes;
-  const startTime = 7 * 60 + 30;
-  const endTime = 11 * 60;
+  const currentTimeInMinutes = hours * 60 + peruTime.getUTCMinutes();
+  const startTime = 7 * 60 + 30; // 7:30 AM
+  const endTime = 11 * 60; // 11:00 AM
 
+  // Determinar saludo según hora
+  let saludo = "";
+  if (hours >= 5 && hours < 12) {
+    saludo = "Buenos días";
+  } else if (hours >= 12 && hours < 19) {
+    saludo = "Buenas tardes";
+  } else {
+    saludo = "Buenas noches";
+  }
+
+  // === VIERNES 7:30-11:00 AM (horario activo) ===
   if (
     dayOfWeek === 5 &&
     currentTimeInMinutes >= startTime &&
     currentTimeInMinutes < endTime
   ) {
-    return null;
+    return null; // Bot funciona normalmente
   }
 
+  // === VIERNES ANTES DE 7:30 AM ===
   if (dayOfWeek === 5 && currentTimeInMinutes < startTime) {
-    return "Buenos días, escríbanos por favor en nuestro horario de atención exactamente a las *7:30 a. m.* ⏰";
+    return `${saludo} 🌅\n\n¡Ya falta poco para asignar las citas!\n\nPor favor, reenvíe su mensaje a las *7:30 a. m. en punto*. ⏰`;
   }
 
+  // === VIERNES DESPUÉS DE 11:00 AM ===
   if (dayOfWeek === 5 && currentTimeInMinutes >= endTime) {
-    return "Los cupos de atención ya se agotaron para hoy. 😔\n\nPor favor, escríbenos el próximo *viernes a partir de las 7:30 a. m.* 📅";
+    return `${saludo} 😔\n\nLos cupos de atención se agotaron el día de hoy.\n\nLa próxima vez, por favor escríbanos más temprano, *exactamente a las 7:30 a. m.* 📅`;
   }
 
-  return "Las citas se asignan únicamente los días *viernes desde las 7:30 a. m. hasta las 11:00 a. m.* 📅⏰\n\nPor favor, escríbenos el próximo viernes en ese horario.";
+  // === JUEVES ===
+  if (dayOfWeek === 4) {
+    return `${saludo} 😊\n\nLas citas se asignarán *mañana viernes a las 7:30 a. m.* hasta agotar los cupos.\n\nPor favor, escríbanos mañana a esa hora. 📅⏰`;
+  }
+
+  // === SÁBADO ===
+  if (dayOfWeek === 6) {
+    return `${saludo} 🌟\n\nAyer viernes en la mañana a las *7:30 a. m.* se programaron las citas.\n\nPor favor, escríbenos el *próximo viernes* para agendar su cita. 📅`;
+  }
+
+  // === DOMINGO ===
+  if (dayOfWeek === 0) {
+    return `${saludo} 😴\n\nEs domingo, deje descansar.\n\nLas citas se asignan únicamente los días *viernes a partir de las 7:30 a. m.* hasta agotar los cupos. 📅`;
+  }
+
+  // === LUNES, MARTES, MIÉRCOLES ===
+  return `${saludo} 😊\n\nLas citas se asignan únicamente los días *viernes a partir de las 7:30 a. m.* hasta agotar los cupos.\n\nPor favor, escríbanos el próximo viernes a esa hora. 📅⏰`;
 }
 
 let turnosCache = [];
