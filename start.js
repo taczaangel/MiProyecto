@@ -1,5 +1,4 @@
 const { exec, spawn } = require("child_process");
-const schedule = require("node-schedule");
 
 const PORT = process.env.PORT || 8080;
 
@@ -21,83 +20,43 @@ server.on("close", (code) => {
   process.exit(code);
 });
 
-// ====== BOT PRINCIPAL (Solo viernes 7:30-11:00 AM) ======
-let botProcess = null;
+// ✅ INICIA EL BOT UNA SOLA VEZ Y LO DEJA ENCENDIDO 24/7
+console.log("🤖 INICIANDO BOT (24/7 - Siempre encendido)...");
 
-function shouldBotBeRunning() {
-  const now = new Date();
-  const peruTime = new Date(now.getTime() - 5 * 60 * 60 * 1000);
-  const dayOfWeek = peruTime.getUTCDay();
-  const hours = peruTime.getUTCHours();
-  const minutes = peruTime.getUTCMinutes();
-  const currentTimeInMinutes = hours * 60 + minutes;
-  const startTime = 7 * 60 + 30;
-  const endTime = 11 * 60;
+const botProcess = spawn("node", ["bot.js"], {
+  env: { ...process.env, SERVER_URL: `http://localhost:${PORT}` },
+});
 
-  return (
-    dayOfWeek === 5 &&
-    currentTimeInMinutes >= startTime &&
-    currentTimeInMinutes < endTime
-  );
-}
+botProcess.stdout.on("data", (data) => {
+  console.log(`[BOT] ${data}`);
+});
 
-function startBot() {
-  if (botProcess) {
-    console.log("⚠️ Bot principal ya está corriendo");
-    return;
-  }
+botProcess.stderr.on("data", (data) => {
+  console.error(`[BOT ERROR] ${data}`);
+});
 
-  console.log("🤖 INICIANDO BOT PRINCIPAL (Reservas)...");
-  botProcess = spawn("node", ["bot.js"], {
-    env: { ...process.env, SERVER_URL: `http://localhost:${PORT}` },
-  });
+botProcess.on("close", (code) => {
+  console.error(`[BOT] ⚠️ Proceso terminado con código ${code}`);
+  console.error(`[BOT] 🔄 Reiniciando bot en 5 segundos...`);
 
-  botProcess.stdout.on("data", (data) => {
-    console.log(`[BOT-PRINCIPAL] ${data}`);
-  });
+  // Si el bot se cae por alguna razón, lo reinicia automáticamente
+  setTimeout(() => {
+    console.log("🤖 Reiniciando bot...");
+    const restartBot = spawn("node", ["bot.js"], {
+      env: { ...process.env, SERVER_URL: `http://localhost:${PORT}` },
+    });
 
-  botProcess.stderr.on("data", (data) => {
-    console.error(`[BOT-PRINCIPAL ERROR] ${data}`);
-  });
+    restartBot.stdout.on("data", (data) => {
+      console.log(`[BOT] ${data}`);
+    });
 
-  botProcess.on("close", (code) => {
-    console.log(`[BOT-PRINCIPAL] Proceso terminado con código ${code}`);
-    botProcess = null;
-  });
-}
+    restartBot.stderr.on("data", (data) => {
+      console.error(`[BOT ERROR] ${data}`);
+    });
+  }, 5000);
+});
 
-function stopBot() {
-  if (!botProcess) {
-    console.log("⚠️ Bot principal no está corriendo");
-    return;
-  }
-
-  console.log("🛑 DETENIENDO BOT PRINCIPAL...");
-  botProcess.kill();
-  botProcess = null;
-}
-
-setInterval(() => {
-  const shouldRun = shouldBotBeRunning();
-  const isRunning = botProcess !== null;
-
-  if (shouldRun && !isRunning) {
-    console.log(
-      "✅ Es hora de iniciar el bot principal (Viernes 7:30-11:00 AM)"
-    );
-    startBot();
-  } else if (!shouldRun && isRunning) {
-    console.log("🔴 Fuera de horario, deteniendo bot principal...");
-    stopBot();
-  }
-}, 60000);
-
-console.log("⏰ Verificando si el bot principal debe estar corriendo...");
-if (shouldBotBeRunning()) {
-  console.log("✅ Horario válido, iniciando bot principal...");
-  startBot();
-} else {
-  console.log(
-    "🔴 Fuera de horario, bot principal NO se iniciará hasta el viernes 7:30 AM"
-  );
-}
+console.log("✅ Sistema iniciado correctamente");
+console.log("📱 Bot encendido 24/7");
+console.log("🕐 Horario de reservas: Viernes 7:30-11:00 AM (Perú)");
+console.log("📨 Respuestas automáticas: Resto del tiempo");
