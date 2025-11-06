@@ -9,9 +9,8 @@ const CITAS_FILE = path.join(__dirname, "citas.json");
 const ADMIN_PHONE = "51959634347@c.us";
 const SERVER_URL = process.env.SERVER_URL || "http://localhost:3000";
 
-const BOT_START_TS = Math.floor(Date.now() / 1000); // ← MUEVE ESTA LÍNEA AQUÍ
+const BOT_START_TS = Math.floor(Date.now() / 1000);
 
-// ========== FUNCIONES DE HORARIO ==========
 function getCurrentPeruTime() {
   const now = new Date();
   const peruTime = new Date(now.getTime() - 5 * 60 * 60 * 1000);
@@ -35,13 +34,12 @@ function isFridayActiveHours() {
 
 function getAutoResponseMessage() {
   const peruTime = getCurrentPeruTime();
-  const dayOfWeek = peruTime.getUTCDay(); // 0=Dom, 1=Lun, 2=Mar, 3=Mié, 4=Jue, 5=Vie, 6=Sáb
+  const dayOfWeek = peruTime.getUTCDay();
   const hours = peruTime.getUTCHours();
   const currentTimeInMinutes = hours * 60 + peruTime.getUTCMinutes();
-  const startTime = 7 * 60 + 30; // 7:30 AM
-  const endTime = 11 * 60; // 11:00 AM
+  const startTime = 7 * 60 + 30;
+  const endTime = 11 * 60;
 
-  // Determinar saludo según hora
   let saludo = "";
   if (hours >= 5 && hours < 12) {
     saludo = "Buenos días";
@@ -51,41 +49,34 @@ function getAutoResponseMessage() {
     saludo = "Buenas noches";
   }
 
-  // === VIERNES 7:30-11:00 AM (horario activo) ===
   if (
     dayOfWeek === 5 &&
     currentTimeInMinutes >= startTime &&
     currentTimeInMinutes < endTime
   ) {
-    return null; // Bot funciona normalmente
+    return null;
   }
 
-  // === VIERNES ANTES DE 7:30 AM ===
   if (dayOfWeek === 5 && currentTimeInMinutes < startTime) {
     return `${saludo} 🌅\n\n¡Ya falta poco para asignar las citas!\n\nPor favor, reenvíe su mensaje a las *7:30 a. m. en punto*. ⏰`;
   }
 
-  // === VIERNES DESPUÉS DE 11:00 AM ===
   if (dayOfWeek === 5 && currentTimeInMinutes >= endTime) {
     return `${saludo} 😔\n\nLos cupos de atención se agotaron el día de hoy.\n\nLa próxima vez, por favor escríbanos más temprano, *exactamente a las 7:30 a. m.* 📅`;
   }
 
-  // === JUEVES ===
   if (dayOfWeek === 4) {
     return `${saludo} 😊\n\nLas citas se asignarán *mañana viernes a las 7:30 a. m.* hasta agotar los cupos.\n\nPor favor, escríbanos mañana a esa hora. 📅⏰`;
   }
 
-  // === SÁBADO ===
   if (dayOfWeek === 6) {
     return `${saludo} 🌟\n\nAyer viernes en la mañana a las *7:30 a. m.* se programaron las citas.\n\nPor favor, escríbenos el *próximo viernes* para agendar su cita. 📅`;
   }
 
-  // === DOMINGO ===
   if (dayOfWeek === 0) {
     return `${saludo} 😴\n\nEs domingo, deje descansar.\n\nLas citas se asignan únicamente los días *viernes a partir de las 7:30 a. m.* hasta agotar los cupos. 📅`;
   }
 
-  // === LUNES, MARTES, MIÉRCOLES ===
   return `${saludo} 😊\n\nLas citas se asignan únicamente los días *viernes a partir de las 7:30 a. m.* hasta agotar los cupos.\n\nPor favor, escríbanos el próximo viernes a esa hora. 📅⏰`;
 }
 
@@ -601,7 +592,6 @@ function buildDoctorSelectionMessage(especialidad, includeManuel = false) {
   if (especialidad === "pediatria") {
     message = "El paciente será atendido en *Odontopediatría* 👶🦷.\n\n";
 
-    // Si solo hay 1 doctor disponible, mensaje especial
     if (doctors.available.length === 1 && doctors.unavailable.length > 0) {
       const availableDoc = doctors.available[0];
       message += `En este momento, solo tenemos turnos disponibles con:\n\n*${optionNumber}* - ${detectProfDisplayFromKey(
@@ -625,7 +615,6 @@ function buildDoctorSelectionMessage(especialidad, includeManuel = false) {
         doctors.available[0]
       )}*?`;
     } else {
-      // Si hay 2 o más doctores disponibles
       message +=
         "Por favor, selecciona el odontopediatra de tu preferencia escribiendo el *número*:\n\n";
 
@@ -656,7 +645,6 @@ function buildDoctorSelectionMessage(especialidad, includeManuel = false) {
       }
     }
   } else {
-    // Si solo hay 1 doctor disponible, mensaje especial
     if (doctors.available.length === 1 && doctors.unavailable.length > 0) {
       const availableDoc = doctors.available[0];
       message = `En este momento, solo tenemos turnos disponibles con:\n\n*${optionNumber}* - ${detectProfDisplayFromKey(
@@ -675,7 +663,6 @@ function buildDoctorSelectionMessage(especialidad, includeManuel = false) {
         doctors.available[0]
       )}*?`;
     } else {
-      // Si hay 2 doctores disponibles
       message =
         "¿Llevas tratamiento con algún odontólogo? 🤔\n\nSi es así, escribe el número correspondiente:\n\n";
 
@@ -751,21 +738,16 @@ client.on("message", async (msg) => {
 
     const chatId = msg.from;
 
-    // ✅ ADMIN puede usar bot siempre
     const isAdmin = chatId === ADMIN_PHONE;
 
-    // ⏰ Verificar horario activo
     if (!isAdmin && !isFridayActiveHours()) {
       const autoResponse = getAutoResponseMessage();
       if (autoResponse) {
         await client.sendMessage(chatId, autoResponse);
         console.log(`📨 Auto-respuesta enviada a ${chatId}`);
       }
-      return; // Detener procesamiento
+      return;
     }
-
-    // ✅ Este bot SOLO funciona viernes 7:30-11:00 AM
-    // Fuera de ese horario NO responde NADA (lo maneja bot-autoresponder)
 
     const raw = (msg.body || "").trim();
     if (!raw) return;
@@ -941,7 +923,6 @@ client.on("message", async (msg) => {
         const doctors = getAvailableDoctors("pediatria");
 
         if (doctors.available.length === 0) {
-          // NO HAY TURNOS EN ODONTOPEDIATRÍA
           await fetchTurnosFromServer("general");
           const doctorsGeneral = getAvailableDoctors("general");
 
@@ -972,7 +953,6 @@ client.on("message", async (msg) => {
         const doctors = getAvailableDoctors("general");
 
         if (doctors.available.length === 0) {
-          // NO HAY TURNOS EN ODONTOLOGÍA GENERAL
           await fetchTurnosFromServer("pediatria");
           const doctorsPediatria = getAvailableDoctors("pediatria");
 
@@ -1083,7 +1063,6 @@ client.on("message", async (msg) => {
     if (state.step === 3.6) {
       const text = raw.trim();
 
-      // Si dice NO cuando solo hay un doctor
       if (isDeny(text)) {
         await fetchTurnosFromServer("general");
         const doctorsGeneral = getAvailableDoctors("general");
@@ -1797,18 +1776,10 @@ async function handleChangeRequest(chatId, state) {
   }
 }
 
-// AL FINAL DE bot.js, CAMBIA ESTO:
-// client.initialize();
-// console.log("🤖 BOT INICIANDO...");
-
-// POR ESTO:
-// No inicializar aquí, lo hace server.js
 if (require.main === module) {
-  // Solo si se ejecuta directamente (node bot.js)
   client.initialize();
   console.log("🤖 BOT INICIANDO STANDALONE...");
 } else {
-  // Si se importa desde server.js
   console.log("🤖 Bot cargado desde server.js");
   client.initialize();
   console.log("🤖 BOT INICIANDO...");

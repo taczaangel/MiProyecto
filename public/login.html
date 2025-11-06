@@ -42,7 +42,7 @@
         position: relative;
       }
 
-      /* Ojo animado */
+
       .eye-container {
         position: relative;
         width: 200px;
@@ -361,7 +361,7 @@
       const usernameInput = document.getElementById("username");
       const loginSide = document.querySelector(".login-side");
 
-      // Seguir el movimiento del mouse
+    
       loginSide.addEventListener("mousemove", (e) => {
         if (!passwordInput.matches(":focus")) {
           const rect = eye.getBoundingClientRect();
@@ -384,7 +384,7 @@
         }
       });
 
-      // Seguir el cursor cuando escribes
+      
       usernameInput.addEventListener("input", () => {
         const rect = usernameInput.getBoundingClientRect();
         const eyeRect = eye.getBoundingClientRect();
@@ -406,7 +406,7 @@
         iris.style.transform = `translate(calc(-50% + ${irisX}px), calc(-50% + ${irisY}px))`;
       });
 
-      // Cerrar ojos cuando escribes contraseña
+      
       passwordInput.addEventListener("focus", () => {
         eye.classList.add("closed");
       });
@@ -415,7 +415,7 @@
         eye.classList.remove("closed");
       });
 
-      // Centrar la pupila cuando no hay movimiento
+   
       loginSide.addEventListener("mouseleave", () => {
         iris.style.transform = "translate(-50%, -50%)";
       });

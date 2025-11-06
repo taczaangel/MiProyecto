@@ -1,18 +1,13 @@
 const express = require("express");
 const path = require("path");
-const fs = require("fs");
 const users = require("./users");
+const pool = require("./db");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-
-const TURNOS_FILE = path.join(__dirname, "turnos.json");
-const CITAS_FILE = path.join(__dirname, "citas.json"); // Para citas confirmadas
-
 app.use(express.static(path.join(__dirname, "public")));
 
 app.get("/", (req, res) => {
@@ -66,556 +61,353 @@ function getEspecialidadFromProf(profKey) {
   }
 }
 
-function arrayToObjByProf(arrayPlano) {
-  const obj = { elio: [], manuel: [], jimy: [], fernando: [] };
-  arrayPlano.forEach((item) => {
-    if (!item.profesional && !item.title) return;
-    const profKey = getProfKeyFromString(item.profesional || item.title);
-    if (!obj[profKey]) return;
-
-    const start = item.turnoInicio || item.start || item.startISO;
-    const end = item.turnoFin || item.end || item.endISO;
-    if (!start) return;
-
-    const evento = {
-      title: item.title || item.profesional || profKey,
-      start: typeof start === "string" ? start : start.toISOString(),
-      end: end ? (typeof end === "string" ? end : end.toISOString()) : null,
-      backgroundColor: item.backgroundColor || getColorForProf(profKey),
-      borderColor: item.borderColor || getColorForProf(profKey),
-      allDay: item.allDay || false,
-      especialidad: item.especialidad || getEspecialidadFromProf(profKey),
-    };
-    obj[profKey].push(evento);
-  });
-  return obj;
-}
-
-function objToArrayPlano(objByProf) {
-  const array = [];
-  ["elio", "manuel", "jimy", "fernando"].forEach((key) => {
-    if (Array.isArray(objByProf[key])) {
-      objByProf[key].forEach((evento) => {
-        array.push({
-          profesional: key,
-          title: evento.title,
-          turnoInicio: evento.start,
-          turnoFin: evento.end,
-          backgroundColor: evento.backgroundColor,
-          borderColor: evento.borderColor,
-          allDay: evento.allDay,
-          especialidad: evento.especialidad,
-        });
-      });
-    }
-  });
-  return array;
-}
-
-app.post("/guardar-turno", (req, res) => {
-  let turnosToSave;
-  if (Array.isArray(req.body)) {
-    turnosToSave = arrayToObjByProf(req.body);
-  } else if (typeof req.body === "object" && req.body.elio !== undefined) {
-    turnosToSave = { ...req.body };
-    fs.readFile(TURNOS_FILE, "utf8", (err, data) => {
-      let existentes = { elio: [], manuel: [], jimy: [], fernando: [] };
-      if (!err && data) {
-        try {
-          const parsed = JSON.parse(data);
-          if (typeof parsed === "object" && !Array.isArray(parsed)) {
-            existentes = parsed;
-          } else if (Array.isArray(parsed)) {
-            existentes = arrayToObjByProf(parsed);
+// POST /guardar-turno - Guardar múltiples turnos
+app.post("/guardar-turno", async (req, res) => {
+  try {
+    let turnosToSave = req.body;
+    
+    // Si viene como array, convertir a objeto por profesional
+    if (Array.isArray(turnosToSave)) {
+      const obj = { elio: [], manuel: [], jimy: [], fernando: [] };
+      turnosToSave.forEach((item) => {
+        const profKey = getProfKeyFromString(item.profesional || item.title);
+        if (obj[profKey]) {
+          const start = item.turnoInicio || item.start || item.startISO;
+          const end = item.turnoFin || item.end || item.endISO;
+          if (start) {
+            obj[profKey].push({
+              title: item.title || item.profesional || profKey,
+              start: typeof start === "string" ? start : start.toISOString(),
+              end: end ? (typeof end === "string" ? end : end.toISOString()) : null,
+              backgroundColor: item.backgroundColor || getColorForProf(profKey),
+              borderColor: item.borderColor || getColorForProf(profKey),
+              especialidad: item.especialidad || getEspecialidadFromProf(profKey),
+            });
           }
-        } catch (e) {
-          console.error("Error parseando existentes:", e);
         }
-      }
+      });
+      turnosToSave = obj;
+    }
 
-      ["elio", "manuel", "jimy", "fernando"].forEach((key) => {
-        const nuevos = Array.isArray(turnosToSave[key])
-          ? turnosToSave[key]
-          : [];
-        const existentesKey = existentes[key] || [];
-        turnosToSave[key] = [...existentesKey];
-        nuevos.forEach((nuevo) => {
-          const yaExiste = existentesKey.some(
-            (e) =>
-              new Date(e.start).toISOString() ===
-                new Date(nuevo.start).toISOString() &&
-              new Date(e.end || e.start).toISOString() ===
-                new Date(nuevo.end || nuevo.start).toISOString()
+    let totalInsertados = 0;
+
+    // Insertar turnos por profesional
+    for (const [profesional, eventos] of Object.entries(turnosToSave)) {
+      if (!Array.isArray(eventos)) continue;
+
+      for (const evento of eventos) {
+        // Verificar si ya existe
+        const existe = await pool.query(
+          `SELECT id FROM turnos 
+           WHERE profesional = $1 AND start_time = $2`,
+          [profesional, evento.start]
+        );
+
+        if (existe.rows.length === 0) {
+          await pool.query(
+            `INSERT INTO turnos 
+            (profesional, title, start_time, end_time, background_color, border_color, all_day, especialidad)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            [
+              profesional,
+              evento.title,
+              evento.start,
+              evento.end,
+              evento.backgroundColor,
+              evento.borderColor,
+              evento.allDay || false,
+              evento.especialidad
+            ]
           );
-          if (!yaExiste) {
-            nuevo.especialidad =
-              nuevo.especialidad || getEspecialidadFromProf(key);
-            turnosToSave[key].push(nuevo);
-          }
-        });
-      });
+          totalInsertados++;
+        }
+      }
+    }
 
-      fs.writeFile(
-        TURNOS_FILE,
-        JSON.stringify(turnosToSave, null, 2),
-        "utf8",
-        (err) => {
-          if (err) {
-            console.error("Error guardando turnos:", err);
-            return res.status(500).json({ message: "Error al guardar turnos" });
-          }
-          console.log(
-            "💾 Turnos guardados (merge):",
-            Object.keys(turnosToSave).map(
-              (k) => `${k}: ${turnosToSave[k].length}`
-            )
+    console.log(`💾 Turnos guardados: ${totalInsertados} nuevos`);
+    res.json({ message: "Turnos guardados correctamente", insertados: totalInsertados });
+
+  } catch (error) {
+    console.error("Error guardando turnos:", error);
+    res.status(500).json({ message: "Error al guardar turnos" });
+  }
+});
+
+// GET /obtener-turnos - Obtener turnos disponibles
+app.get("/obtener-turnos", async (req, res) => {
+  try {
+    const especialidad = req.query.especialidad;
+    const now = new Date();
+    now.setUTCHours(0, 0, 0, 0);
+
+    let query = `
+      SELECT profesional, title, start_time, end_time, background_color, especialidad, held_by, held_until
+      FROM turnos 
+      WHERE start_time >= $1
+    `;
+    const params = [now];
+
+    if (especialidad) {
+      query += ` AND especialidad = $2`;
+      params.push(especialidad);
+    }
+
+    query += ` ORDER BY start_time ASC`;
+
+    const result = await pool.query(query, params);
+
+    // Agrupar por profesional y fecha
+    const agrupados = {};
+    
+    for (const t of result.rows) {
+      const startDate = new Date(t.start_time);
+      
+      // Verificar si el hold está activo
+      if (t.held_by && t.held_until) {
+        const heldUntil = new Date(t.held_until);
+        if (heldUntil > new Date()) {
+          console.log(`⏳ Slot en hold activo: ${t.title} ${startDate.toISOString().slice(11, 16)}Z`);
+          continue; // No mostrar slots en hold
+        } else {
+          // Limpiar hold expirado
+          await pool.query(
+            `UPDATE turnos SET held_by = NULL, held_until = NULL WHERE profesional = $1 AND start_time = $2`,
+            [t.profesional, t.start_time]
           );
-          res.json({ message: "Turnos guardados correctamente" });
+          console.log(`🕐 Hold expirado auto: ${t.title} ${startDate.toISOString().slice(11, 16)}Z`);
         }
-      );
-    });
-    return;
-  } else {
-    turnosToSave = arrayToObjByProf([req.body]);
+      }
+
+      const date = startDate.toISOString().split("T")[0];
+      const horaInicio = `${startDate.getUTCHours().toString().padStart(2, "0")}:${startDate.getUTCMinutes().toString().padStart(2, "0")}`;
+      const endDate = new Date(t.end_time);
+      const horaFin = `${endDate.getUTCHours().toString().padStart(2, "0")}:${endDate.getUTCMinutes().toString().padStart(2, "0")}`;
+
+      const key = `${t.profesional}_${date}`;
+      if (!agrupados[key]) {
+        agrupados[key] = {
+          title: t.title,
+          date,
+          slots: [],
+          color: t.background_color,
+          especialidad: t.especialidad,
+        };
+      }
+      agrupados[key].slots.push({ start: horaInicio, end: horaFin });
+    }
+
+    const turnos = Object.values(agrupados);
+    console.log(`📖 Turnos obtenidos (futuros${especialidad ? `, ${especialidad}` : ""}): ${turnos.length} grupos`);
+    res.json(turnos);
+
+  } catch (error) {
+    console.error("Error obteniendo turnos:", error);
+    res.status(500).json({ message: "Error al obtener turnos" });
   }
-
-  fs.writeFile(
-    TURNOS_FILE,
-    JSON.stringify(turnosToSave, null, 2),
-    "utf8",
-    (err) => {
-      if (err) {
-        console.error("Error guardando turnos:", err);
-        return res.status(500).json({ message: "Error al guardar turnos" });
-      }
-      console.log(
-        "💾 Turnos guardados (simple):",
-        Object.keys(turnosToSave).map((k) => `${k}: ${turnosToSave[k].length}`)
-      );
-      res.json({ message: "Turnos guardados correctamente" });
-    }
-  );
 });
 
-app.get("/obtener-turnos", (req, res) => {
-  const especialidad = req.query.especialidad;
-  const now = new Date();
-  now.setUTCHours(0, 0, 0, 0);
+// GET /obtener-citas - Obtener todas las citas
+app.get("/obtener-citas", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, nombre, dni, edad, consultorio, profesional, fecha, hora, 
+              chat_id as "chatId", status, confirmed_at as "confirmedAt", 
+              start_utc as "startUTC"
+       FROM citas 
+       ORDER BY start_utc ASC`
+    );
 
-  fs.readFile(TURNOS_FILE, "utf8", (err, data) => {
-    if (err) {
-      if (err.code === "ENOENT") {
-        const initial = { elio: [], manuel: [], jimy: [], fernando: [] };
-        fs.writeFileSync(TURNOS_FILE, JSON.stringify(initial, null, 2), "utf8");
-        console.log("📄 turnos.json creado inicial");
-        return res.json([]);
-      }
-      console.error("Error al leer turnos.json:", err);
-      return res.status(500).json({ message: "Error al leer turnos" });
-    }
+    console.log(`📖 Citas obtenidas: ${result.rows.length}`);
+    res.json(result.rows);
 
-    try {
-      let turnos = JSON.parse(data);
-      if (!turnos) turnos = [];
-
-      let agrupados = {};
-      if (typeof turnos === "object" && !Array.isArray(turnos)) {
-        turnos = objToArrayPlano(turnos);
-      }
-
-      turnos.forEach((t) => {
-        if (!t.turnoInicio && !t.start) return;
-        const start = t.turnoInicio || t.start;
-        const end = t.turnoFin || t.end;
-        if (!start || !end) return;
-        const startDate = new Date(start);
-        if (startDate < now) return;
-
-        let isHeldActive = false;
-        if (t.heldBy && t.heldUntil) {
-          const heldUntil = new Date(t.heldUntil);
-          if (heldUntil > now) {
-            isHeldActive = true;
-            console.log(
-              `⏳ Slot en hold activo: ${t.title || "Desconocido"} ${startDate
-                .toISOString()
-                .slice(11, 16)}Z`
-            );
-            return;
-          } else {
-            t.heldBy = null;
-            t.heldUntil = null;
-            console.log(
-              `🕐 Hold expirado auto: ${t.title || "Desconocido"} ${startDate
-                .toISOString()
-                .slice(11, 16)}Z`
-            );
-          }
-        }
-        if (isHeldActive) return;
-
-        const profesional = t.profesional || t.title || "Desconocido";
-        const profKey = getProfKeyFromString(profesional);
-        const esp = t.especialidad || getEspecialidadFromProf(profKey);
-        // Filtrar por especialidad si se pide
-        if (especialidad && esp !== especialidad) return;
-        const date = startDate.toISOString().split("T")[0];
-        const horaInicio = `${startDate
-          .getUTCHours()
-          .toString()
-          .padStart(2, "0")}:${startDate
-          .getUTCMinutes()
-          .toString()
-          .padStart(2, "0")}`;
-        const horaFin = (() => {
-          const endDate = new Date(end);
-          return `${endDate.getUTCHours().toString().padStart(2, "0")}:${endDate
-            .getUTCMinutes()
-            .toString()
-            .padStart(2, "0")}`;
-        })();
-
-        const key = `${profesional}_${date}`;
-        if (!agrupados[key]) {
-          agrupados[key] = {
-            title: profesional,
-            date,
-            slots: [],
-            color: getColorForProf(profKey),
-            especialidad: esp,
-          };
-        }
-        agrupados[key].slots.push({ start: horaInicio, end: horaFin });
-      });
-
-      const result = Object.values(agrupados);
-      console.log(
-        `📖 Turnos obtenidos (futuros${
-          especialidad ? `, ${especialidad}` : ""
-        }): ${result.length} grupos`
-      );
-      res.json(result);
-    } catch (e) {
-      console.error("Error al procesar turnos:", e);
-      res.status(500).json({ message: "Error al procesar turnos" });
-    }
-  });
-});
-
-app.get("/obtener-citas", (req, res) => {
-  fs.readFile(CITAS_FILE, "utf8", (err, data) => {
-    if (err) {
-      if (err.code === "ENOENT") {
-        const initial = [];
-        fs.writeFileSync(CITAS_FILE, JSON.stringify(initial, null, 2), "utf8");
-        return res.json([]);
-      }
-      console.error("Error al leer citas.json:", err);
-      return res.status(500).json({ message: "Error al leer citas" });
-    }
-
-    try {
-      const citas = JSON.parse(data);
-      if (!Array.isArray(citas)) citas = [];
-      console.log(`📖 Citas obtenidas: ${citas.length}`);
-      res.json(citas);
-    } catch (e) {
-      console.error("Error al procesar citas:", e);
-      res.status(500).json({ message: "Error al procesar citas" });
-    }
-  });
-});
-
-app.post("/reservar-turno", (req, res) => {
-  const { profesional, turnoInicio, userJid } = req.body;
-  if (!profesional || !turnoInicio) {
-    return res
-      .status(400)
-      .json({ message: "Se requiere profesional y turnoInicio" });
+  } catch (error) {
+    console.error("Error obteniendo citas:", error);
+    res.status(500).json({ message: "Error al obtener citas" });
   }
-
-  const profKey = getProfKeyFromString(profesional);
-  const startISO = new Date(turnoInicio).toISOString();
-
-  fs.readFile(TURNOS_FILE, "utf8", (err, data) => {
-    let turnosObj = { elio: [], manuel: [], jimy: [], fernando: [] };
-    if (err || !data) {
-      return res.status(404).json({ message: "Turno no encontrado" });
-    }
-
-    try {
-      const parsed = JSON.parse(data);
-      if (typeof parsed === "object" && !Array.isArray(parsed)) {
-        turnosObj = parsed;
-      } else if (Array.isArray(parsed)) {
-        turnosObj = arrayToObjByProf(parsed);
-      }
-    } catch (e) {
-      console.error("Error parseando:", e);
-      return res.status(500).json({ message: "Error al leer turnos" });
-    }
-
-    const list = turnosObj[profKey] || [];
-    const idx = list.findIndex(
-      (e) => new Date(e.start).toISOString() === startISO
-    );
-    if (idx === -1) {
-      return res
-        .status(404)
-        .json({ message: "Turno no encontrado (ya reservado?)" });
-    }
-
-    const eliminado = list.splice(idx, 1)[0];
-    turnosObj[profKey] = list;
-
-    fs.writeFile(
-      TURNOS_FILE,
-      JSON.stringify(turnosObj, null, 2),
-      "utf8",
-      (err) => {
-        if (err) {
-          console.error("Error al actualizar turnos:", err);
-          return res
-            .status(500)
-            .json({ message: "Error al actualizar turnos" });
-        }
-        console.log("🔒 Turno reservado:", eliminado.title, startISO);
-        res.json({ message: "Turno reservado correctamente", eliminado });
-      }
-    );
-  });
 });
 
-app.post("/liberar-turno", (req, res) => {
-  const { profesional, turnoInicio, turnoFin, title, especialidad } = req.body;
-  if (!profesional || !turnoInicio) {
-    return res
-      .status(400)
-      .json({ message: "Se requiere profesional y turnoInicio" });
-  }
-
-  const profKey = getProfKeyFromString(profesional);
-  const startISO = new Date(turnoInicio).toISOString();
-  const endISO = turnoFin ? new Date(turnoFin).toISOString() : null;
-
-  fs.readFile(TURNOS_FILE, "utf8", (err, data) => {
-    let turnosObj = { elio: [], manuel: [], jimy: [], fernando: [] };
-    if (err || !data) {
-      return res.status(500).json({ message: "Error al leer turnos" });
+// POST /reservar-turno - Reservar un turno (elimina de disponibles)
+app.post("/reservar-turno", async (req, res) => {
+  try {
+    const { profesional, turnoInicio, userJid } = req.body;
+    
+    if (!profesional || !turnoInicio) {
+      return res.status(400).json({ message: "Se requiere profesional y turnoInicio" });
     }
 
-    try {
-      const parsed = JSON.parse(data);
-      if (typeof parsed === "object" && !Array.isArray(parsed)) {
-        turnosObj = parsed;
-      } else if (Array.isArray(parsed)) {
-        turnosObj = arrayToObjByProf(parsed);
-      }
-    } catch (e) {
-      console.error("Error parseando:", e);
-      return res.status(500).json({ message: "Error al leer turnos" });
-    }
+    const profKey = getProfKeyFromString(profesional);
+    const startISO = new Date(turnoInicio).toISOString();
 
-    const list = turnosObj[profKey] || [];
-    const yaExiste = list.some(
-      (e) => new Date(e.start).toISOString() === startISO
+    // Buscar y eliminar el turno
+    const result = await pool.query(
+      `DELETE FROM turnos 
+       WHERE profesional = $1 AND start_time = $2
+       RETURNING *`,
+      [profKey, startISO]
     );
-    if (yaExiste) {
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Turno no encontrado (ya reservado?)" });
+    }
+
+    const eliminado = result.rows[0];
+    console.log("🔒 Turno reservado:", eliminado.title, startISO);
+    res.json({ message: "Turno reservado correctamente", eliminado });
+
+  } catch (error) {
+    console.error("Error reservando turno:", error);
+    res.status(500).json({ message: "Error al reservar turno" });
+  }
+});
+
+// POST /liberar-turno - Liberar un turno (vuelve a disponibles)
+app.post("/liberar-turno", async (req, res) => {
+  try {
+    const { profesional, turnoInicio, turnoFin, title, especialidad } = req.body;
+    
+    if (!profesional || !turnoInicio) {
+      return res.status(400).json({ message: "Se requiere profesional y turnoInicio" });
+    }
+
+    const profKey = getProfKeyFromString(profesional);
+    const startISO = new Date(turnoInicio).toISOString();
+    const endISO = turnoFin ? new Date(turnoFin).toISOString() : null;
+
+    // Verificar si ya existe
+    const existe = await pool.query(
+      `SELECT id FROM turnos WHERE profesional = $1 AND start_time = $2`,
+      [profKey, startISO]
+    );
+
+    if (existe.rows.length > 0) {
       return res.status(409).json({ message: "Turno ya disponible" });
     }
 
-    const nuevo = {
-      title: title || profesional,
-      start: startISO,
-      end: endISO,
-      backgroundColor: getColorForProf(profKey),
-      borderColor: getColorForProf(profKey),
-      allDay: false,
-      especialidad: especialidad || getEspecialidadFromProf(profKey),
-      heldBy: null,
-      heldUntil: null,
-    };
-
-    if (nuevo.heldBy) {
-      nuevo.heldBy = null;
-      nuevo.heldUntil = null;
-      console.log(
-        `🔄 Held limpiado en liberación: ${profesional} ${startISO.slice(
-          11,
-          16
-        )}Z`
-      );
-    }
-
-    list.push(nuevo);
-    turnosObj[profKey] = list;
-
-    fs.writeFile(
-      TURNOS_FILE,
-      JSON.stringify(turnosObj, null, 2),
-      "utf8",
-      (err) => {
-        if (err) {
-          console.error("Error al actualizar turnos:", err);
-          return res
-            .status(500)
-            .json({ message: "Error al actualizar turnos" });
-        }
-        console.log("🔓 Turno liberado:", nuevo.title, startISO);
-        res.json({ message: "Turno liberado correctamente", nuevo });
-      }
+    // Insertar turno liberado
+    const result = await pool.query(
+      `INSERT INTO turnos 
+      (profesional, title, start_time, end_time, background_color, border_color, all_day, especialidad)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING *`,
+      [
+        profKey,
+        title || profesional,
+        startISO,
+        endISO,
+        getColorForProf(profKey),
+        getColorForProf(profKey),
+        false,
+        especialidad || getEspecialidadFromProf(profKey)
+      ]
     );
-  });
+
+    console.log("🔓 Turno liberado:", result.rows[0].title, startISO);
+    res.json({ message: "Turno liberado correctamente", nuevo: result.rows[0] });
+
+  } catch (error) {
+    console.error("Error liberando turno:", error);
+    res.status(500).json({ message: "Error al liberar turno" });
+  }
 });
 
-app.post("/hold-turno", (req, res) => {
-  const { profesional, turnoInicio, userJid } = req.body;
-  if (!profesional || !turnoInicio || !userJid) {
-    return res.status(400).json({
-      error: "Faltan datos: profesional, turnoInicio (ISO Z), userJid",
-    });
-  }
-
-  const profKey = getProfKeyFromString(profesional);
-  const startISO = new Date(turnoInicio).toISOString();
-  const now = new Date();
-  const holdUntil = new Date(now.getTime() + 5 * 60 * 1000).toISOString();
-
-  fs.readFile(TURNOS_FILE, "utf8", (err, data) => {
-    let turnosObj = { elio: [], manuel: [], jimy: [], fernando: [] };
-    if (err || !data) {
-      return res.status(404).json({ error: "No se pudo leer turnos.json" });
+// POST /hold-turno - Bloquear temporalmente un turno (5 min)
+app.post("/hold-turno", async (req, res) => {
+  try {
+    const { profesional, turnoInicio, userJid } = req.body;
+    
+    if (!profesional || !turnoInicio || !userJid) {
+      return res.status(400).json({ error: "Faltan datos: profesional, turnoInicio, userJid" });
     }
 
-    try {
-      const parsed = JSON.parse(data);
-      if (typeof parsed === "object" && !Array.isArray(parsed)) {
-        turnosObj = parsed;
-      } else if (Array.isArray(parsed)) {
-        turnosObj = arrayToObjByProf(parsed);
-      }
-    } catch (e) {
-      console.error("Error parseando en /hold-turno:", e);
-      return res.status(500).json({ error: "Error al leer turnos" });
-    }
+    const profKey = getProfKeyFromString(profesional);
+    const startISO = new Date(turnoInicio).toISOString();
+    const now = new Date();
+    const holdUntil = new Date(now.getTime() + 5 * 60 * 1000); // 5 minutos
 
-    const list = turnosObj[profKey] || [];
-    const idx = list.findIndex(
-      (e) => new Date(e.start).toISOString() === startISO
+    // Verificar si existe y no está en hold
+    const turno = await pool.query(
+      `SELECT held_by, held_until FROM turnos 
+       WHERE profesional = $1 AND start_time = $2`,
+      [profKey, startISO]
     );
-    if (idx === -1) {
+
+    if (turno.rows.length === 0) {
       return res.status(404).json({ error: "Slot no encontrado" });
     }
 
-    const evento = list[idx];
-    // Chequea si libre (no held activo, no reservado – asumimos reserved no existe, ya que splicea)
-    if (evento.heldBy && new Date(evento.heldUntil) > now) {
-      return res
-        .status(409)
-        .json({ error: "Slot ya en hold por otro usuario" });
+    const t = turno.rows[0];
+    if (t.held_by && new Date(t.held_until) > now) {
+      return res.status(409).json({ error: "Slot ya en hold por otro usuario" });
     }
 
-    // Set hold
-    evento.heldBy = userJid;
-    evento.heldUntil = holdUntil;
-    turnosObj[profKey] = list; // Actualiza lista
-
-    fs.writeFile(
-      TURNOS_FILE,
-      JSON.stringify(turnosObj, null, 2),
-      "utf8",
-      (err) => {
-        if (err) {
-          console.error("Error al guardar hold:", err);
-          return res.status(500).json({ error: "Error al guardar hold" });
-        }
-        console.log(
-          `⏳ Hold temporal creado: ${profesional} ${startISO.slice(
-            11,
-            16
-          )}Z por ${userJid} hasta ${holdUntil.slice(11, 16)}Z`
-        );
-        res.json({
-          success: true,
-          message: "Hold temporal creado (5 min)",
-          holdUntil,
-        });
-      }
+    // Aplicar hold
+    await pool.query(
+      `UPDATE turnos 
+       SET held_by = $1, held_until = $2 
+       WHERE profesional = $3 AND start_time = $4`,
+      [userJid, holdUntil, profKey, startISO]
     );
-  });
-});
 
-// ======== LIBERAR HOLD TEMPORAL (devuelve slot a disponible) ========
-app.post("/liberar-hold", (req, res) => {
-  const { profesional, turnoInicio, userJid } = req.body;
-  if (!profesional || !turnoInicio || !userJid) {
-    return res.status(400).json({
-      error: "Faltan datos: profesional, turnoInicio (ISO Z), userJid",
-    });
+    console.log(`⏳ Hold temporal creado: ${profesional} ${startISO.slice(11, 16)}Z por ${userJid}`);
+    res.json({ success: true, message: "Hold temporal creado (5 min)", holdUntil: holdUntil.toISOString() });
+
+  } catch (error) {
+    console.error("Error en hold:", error);
+    res.status(500).json({ error: "Error al crear hold" });
   }
-
-  const profKey = getProfKeyFromString(profesional);
-  const startISO = new Date(turnoInicio).toISOString();
-  const now = new Date();
-
-  fs.readFile(TURNOS_FILE, "utf8", (err, data) => {
-    let turnosObj = { elio: [], manuel: [], jimy: [], fernando: [] };
-    if (err || !data) {
-      return res.status(404).json({ error: "No se pudo leer turnos.json" });
-    }
-
-    try {
-      const parsed = JSON.parse(data);
-      if (typeof parsed === "object" && !Array.isArray(parsed)) {
-        turnosObj = parsed;
-      } else if (Array.isArray(parsed)) {
-        turnosObj = arrayToObjByProf(parsed);
-      }
-    } catch (e) {
-      console.error("Error parseando en /liberar-hold:", e);
-      return res.status(500).json({ error: "Error al leer turnos" });
-    }
-
-    const list = turnosObj[profKey] || [];
-    const idx = list.findIndex(
-      (e) =>
-        new Date(e.start).toISOString() === startISO && e.heldBy === userJid
-    );
-    if (idx === -1) {
-      return res
-        .status(404)
-        .json({ error: "Hold no encontrado o no pertenece a este usuario" });
-    }
-
-    const evento = list[idx];
-    // Limpia hold
-    evento.heldBy = null;
-    evento.heldUntil = null;
-    turnosObj[profKey] = list; // Actualiza
-
-    fs.writeFile(
-      TURNOS_FILE,
-      JSON.stringify(turnosObj, null, 2),
-      "utf8",
-      (err) => {
-        if (err) {
-          console.error("Error al liberar hold:", err);
-          return res.status(500).json({ error: "Error al liberar hold" });
-        }
-        console.log(
-          `🔓 Hold liberado: ${profesional} ${startISO.slice(
-            11,
-            16
-          )}Z por ${userJid}`
-        );
-        res.json({ success: true, message: "Hold liberado correctamente" });
-      }
-    );
-  });
 });
 
-app.listen(PORT, () => {
+// POST /liberar-hold - Liberar un hold temporal
+app.post("/liberar-hold", async (req, res) => {
+  try {
+    const { profesional, turnoInicio, userJid } = req.body;
+    
+    if (!profesional || !turnoInicio || !userJid) {
+      return res.status(400).json({ error: "Faltan datos: profesional, turnoInicio, userJid" });
+    }
+
+    const profKey = getProfKeyFromString(profesional);
+    const startISO = new Date(turnoInicio).toISOString();
+
+    const result = await pool.query(
+      `UPDATE turnos 
+       SET held_by = NULL, held_until = NULL 
+       WHERE profesional = $1 AND start_time = $2 AND held_by = $3
+       RETURNING *`,
+      [profKey, startISO, userJid]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Hold no encontrado o no pertenece a este usuario" });
+    }
+
+    console.log(`🔓 Hold liberado: ${profesional} ${startISO.slice(11, 16)}Z por ${userJid}`);
+    res.json({ success: true, message: "Hold liberado correctamente" });
+
+  } catch (error) {
+    console.error("Error liberando hold:", error);
+    res.status(500).json({ error: "Error al liberar hold" });
+  }
+});
+
+// Inicializar tablas al arrancar
+async function initDB() {
+  try {
+    const fs = require('fs');
+    const schemaPath = path.join(__dirname, 'schema.sql');
+    
+    if (fs.existsSync(schemaPath)) {
+      const schema = fs.readFileSync(schemaPath, 'utf8');
+      await pool.query(schema);
+      console.log('✅ Tablas verificadas/creadas en PostgreSQL');
+    }
+  } catch (error) {
+    console.error('❌ Error inicializando BD:', error);
+  }
+}
+
+app.listen(PORT, async () => {
+  await initDB();
   console.log(`✅ Servidor corriendo en http://localhost:${PORT}`);
-  console.log(`📄 Archivos: turnos.json y citas.json listos para uso.`);
+  console.log(`🐘 PostgreSQL conectado - Railway Database`);
 });
-

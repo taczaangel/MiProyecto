@@ -1,1 +1,28 @@
-[]
+[
+  {
+    "nombre": "Ángel Tacza",
+    "dni": "75962026",
+    "edad": 21,
+    "consultorio": "odontologia general",
+    "profesional": "elio",
+    "fecha": "10/11/2025",
+    "hora": "07:20 a. m.",
+    "chatId": "51959634347@c.us",
+    "status": "confirmada",
+    "confirmedAt": "2025-11-06T13:30:56.453Z",
+    "startUTC": "2025-11-10T12:20:00.000Z"
+  },
+  {
+    "nombre": "Lecia Ordóñez",
+    "dni": "12345678",
+    "edad": 2,
+    "consultorio": "odontopediatria",
+    "profesional": "jimy",
+    "fecha": "10/11/2025",
+    "hora": "07:20 a. m.",
+    "chatId": "51959634347@c.us",
+    "status": "confirmada",
+    "confirmedAt": "2025-11-06T13:32:12.524Z",
+    "startUTC": "2025-11-10T12:20:00.000Z"
+  }
+]

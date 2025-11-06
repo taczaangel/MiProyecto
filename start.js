@@ -39,7 +39,7 @@ botProcess.on("close", (code) => {
   console.error(`[BOT] ⚠️ Proceso terminado con código ${code}`);
   console.error(`[BOT] 🔄 Reiniciando bot en 5 segundos...`);
 
-  // Si el bot se cae por alguna razón, lo reinicia automáticamente
+  
   setTimeout(() => {
     console.log("🤖 Reiniciando bot...");
     const restartBot = spawn("node", ["bot.js"], {
