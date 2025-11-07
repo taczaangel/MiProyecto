@@ -1,26 +1,2 @@
 {
-  "elio": [],
-  "manuel": [
-    {
-      "title": "CD Manuel Romani",
-      "start": "2025-11-10T12:20:00.000Z",
-      "end": "2025-11-10T13:00:00.000Z",
-      "backgroundColor": "#28a745",
-      "borderColor": "#28a745",
-      "allDay": false,
-      "especialidad": "general"
-    }
-  ],
-  "jimy": [],
-  "fernando": [
-    {
-      "title": "Esp. CD Fernando Bustamante",
-      "start": "2025-11-10T12:20:00.000Z",
-      "end": "2025-11-10T13:00:00.000Z",
-      "backgroundColor": "#ffc107",
-      "borderColor": "#ffc107",
-      "allDay": false,
-      "especialidad": "pediatria"
-    }
-  ]
 }

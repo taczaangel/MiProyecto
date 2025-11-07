@@ -1,2 +1,3 @@
-2025/10/31-07:43:15.727 3e080 Creating DB C:\ÁNGELTACZA\Desarrollo\Proyectos\nuevosproyectos\MiProyecto\.wwebjs_auth\session\Default\shared_proto_db since it was missing.
-2025/10/31-07:43:15.732 3e080 Reusing MANIFEST C:\ÁNGELTACZA\Desarrollo\Proyectos\nuevosproyectos\MiProyecto\.wwebjs_auth\session\Default\shared_proto_db/MANIFEST-000001
+2025/11/06-09:10:06.439 48260 Reusing MANIFEST C:\ÁNGELTACZA\Desarrollo\Proyectos\nuevosproyectos\MiProyecto\.wwebjs_auth\session\Default\shared_proto_db/MANIFEST-000001
+2025/11/06-09:10:06.440 48260 Recovering log #3
+2025/11/06-09:10:06.441 48260 Reusing old log C:\ÁNGELTACZA\Desarrollo\Proyectos\nuevosproyectos\MiProyecto\.wwebjs_auth\session\Default\shared_proto_db/000003.log 

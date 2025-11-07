@@ -1,3 +1,6 @@
-2025/11/06-09:04:50.299 4ec18 Reusing MANIFEST C:\ÁNGELTACZA\Desarrollo\Proyectos\nuevosproyectos\MiProyecto\.wwebjs_auth\session\Default\Local Storage\leveldb/MANIFEST-000001
-2025/11/06-09:04:50.300 4ec18 Recovering log #4
-2025/11/06-09:04:50.303 4ec18 Reusing old log C:\ÁNGELTACZA\Desarrollo\Proyectos\nuevosproyectos\MiProyecto\.wwebjs_auth\session\Default\Local Storage\leveldb/000004.log 
+2025/11/07-07:31:40.773 47fdc Reusing MANIFEST C:\ÁNGELTACZA\Desarrollo\Proyectos\nuevosproyectos\MiProyecto\.wwebjs_auth\session\Default\Local Storage\leveldb/MANIFEST-000001
+2025/11/07-07:31:40.824 47fdc Recovering log #4
+2025/11/07-07:31:40.831 47fdc Reusing old log C:\ÁNGELTACZA\Desarrollo\Proyectos\nuevosproyectos\MiProyecto\.wwebjs_auth\session\Default\Local Storage\leveldb/000004.log 
+2025/11/07-08:41:57.297 507e4 Level-0 table #8: started
+2025/11/07-08:41:57.301 507e4 Level-0 table #8: 15609 bytes OK
+2025/11/07-08:41:57.305 507e4 Delete type=0 #4

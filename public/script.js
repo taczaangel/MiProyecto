@@ -1,4 +1,7 @@
 document.addEventListener("DOMContentLoaded", function () {
+
+  const API_URL = "https://miproyecto-production-4eb7.up.railway.app";
+
   const calendarEl = document.getElementById("calendar");
   const profesionalSelect = document.getElementById("selectProfesional");
   const btnGuardar = document.getElementById("btnGuardar");
@@ -13,6 +16,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const modalCancelBtn = document.getElementById("modalCancelBtn");
 
   let modoBorradoActivo = false;
+
 
   const profesionales = {
     elio: {
@@ -37,6 +41,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   };
 
+  
   const serverEvents = {
     elio: [],
     manuel: [],
@@ -51,6 +56,14 @@ document.addEventListener("DOMContentLoaded", function () {
     fernando: [],
   };
 
+  const pendingDeletes = {
+    elio: [],
+    manuel: [],
+    jimy: [],
+    fernando: [],
+  };
+
+
   const cacheTurnos = {
     elio: null,
     manuel: null,
@@ -60,8 +73,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
   let cacheGlobal = null;
   let cacheTimestampGlobal = 0;
-  const CACHE_DURATION = 5000;
+  const CACHE_DURATION = 5000; // 5 segundos
 
+  
   let fechaLunesSemana = new Date();
   const diaSemanaActual = fechaLunesSemana.getDay();
   const diff =
@@ -70,6 +84,36 @@ document.addEventListener("DOMContentLoaded", function () {
     (diaSemanaActual === 0 ? -6 : 1);
   fechaLunesSemana.setDate(diff + 7);
   fechaLunesSemana.setHours(0, 0, 0, 0);
+
+ 
+  const bloquesHorarios = [
+    "07:20",
+    "08:00",
+    "08:40",
+    "09:20",
+    "10:00",
+    "10:40",
+    "11:20",
+    "12:00", // ALMUERZO
+    "13:20",
+    "14:00",
+    "14:40",
+    "15:20",
+    "16:00",
+    "16:40",
+  ];
+
+  const diasSemana = [
+    "Lunes",
+    "Martes",
+    "Miércoles",
+    "Jueves",
+    "Viernes",
+    "Sábado",
+    "Domingo",
+  ];
+
+ 
 
   function formatoRango(inicioStr) {
     const inicio = new Date(fechaLunesSemana);
@@ -90,33 +134,6 @@ document.addEventListener("DOMContentLoaded", function () {
       })
     );
   }
-
-  const bloquesHorarios = [
-    "07:20",
-    "08:00",
-    "08:40",
-    "09:20",
-    "10:00",
-    "10:40",
-    "11:20",
-    "12:00",
-    "13:20",
-    "14:00",
-    "14:40",
-    "15:20",
-    "16:00",
-    "16:40",
-  ];
-
-  const diasSemana = [
-    "Lunes",
-    "Martes",
-    "Miércoles",
-    "Jueves",
-    "Viernes",
-    "Sábado",
-    "Domingo",
-  ];
 
   function getProfKeyFromString(str) {
     const s = (str || "").toLowerCase();
@@ -159,6 +176,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
   let currentConfirmCallback = null;
 
+  // ==========================================
+  // EVENT LISTENERS DE MODAL
+  // ==========================================
+
   modalConfirmBtn.addEventListener("click", () => {
     if (currentConfirmCallback) {
       currentConfirmCallback();
@@ -172,12 +193,17 @@ document.addEventListener("DOMContentLoaded", function () {
     if (e.target === modalOverlay) cerrarModal();
   });
 
+  // ==========================================
+  // GENERACIÓN DE TABLA
+  // ==========================================
+
   function generarTabla() {
     calendarEl.innerHTML = "";
 
     const tabla = document.createElement("table");
     tabla.className = "calendario-tabla";
 
+    // Crear header
     const thead = document.createElement("thead");
     const filaHeader = document.createElement("tr");
     const thHora = document.createElement("th");
@@ -193,6 +219,7 @@ document.addEventListener("DOMContentLoaded", function () {
     thead.appendChild(filaHeader);
     tabla.appendChild(thead);
 
+    // Crear body
     const tbody = document.createElement("tbody");
     bloquesHorarios.forEach((horaInicio) => {
       const fila = document.createElement("tr");
@@ -229,6 +256,10 @@ document.addEventListener("DOMContentLoaded", function () {
     window.slotsCache = calendarEl.querySelectorAll(".slot");
   }
 
+  // ==========================================
+  // LIMPIEZA DE SLOTS
+  // ==========================================
+
   function limpiarSlots() {
     window.slotsCache.forEach((slot) => {
       slot.innerHTML = "";
@@ -240,9 +271,15 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
+  // ==========================================
+  // CARGAR EVENTOS DEL SERVIDOR (PostgreSQL)
+  // ==========================================
+
   function cargarServerEvents(profKey) {
     const cacheEntry = cacheTurnos[profKey];
     const now = Date.now();
+
+    // Usar caché si está disponible
     if (cacheEntry && now - cacheEntry.timestamp < CACHE_DURATION) {
       if (serverEvents[profKey].length === 0) {
         serverEvents[profKey] = cacheEntry.data.flatMap((grupo) => {
@@ -269,10 +306,16 @@ document.addEventListener("DOMContentLoaded", function () {
       return Promise.resolve(serverEvents[profKey]);
     }
 
+    // Hacer petición a PostgreSQL
     return fetch(
-      `/obtener-turnos?especialidad=${profesionales[profKey].especialidad}`
+      `${API_URL}/obtener-turnos?especialidad=${profesionales[profKey].especialidad}`
     )
-      .then((response) => response.json())
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Error HTTP: ${response.status}`);
+        }
+        return response.json();
+      })
       .then((data) => {
         cacheTurnos[profKey] = { data, timestamp: now };
         serverEvents[profKey] = data.flatMap((grupo) => {
@@ -295,14 +338,22 @@ document.addEventListener("DOMContentLoaded", function () {
           }
           return events;
         });
+        console.log(
+          `✅ Turnos cargados desde PostgreSQL para ${profKey}:`,
+          serverEvents[profKey].length
+        );
         return serverEvents[profKey];
       })
       .catch((err) => {
-        console.error("Error cargando eventos del servidor:", err);
+        console.error("❌ Error cargando eventos del servidor:", err);
         mostrarMensaje("Error al cargar turnos del servidor.", "error");
         return [];
       });
   }
+
+  // ==========================================
+  // ACTUALIZAR SLOTS EN LA TABLA
+  // ==========================================
 
   function actualizarSlots(profKey) {
     if (!profKey) {
@@ -313,9 +364,12 @@ document.addEventListener("DOMContentLoaded", function () {
     limpiarSlots();
 
     cargarServerEvents(profKey).then((serverEvts) => {
+      // Filtrar eventos que no están marcados para borrar
       const visibleServer = serverEvts.filter(
         (e) => !pendingDeletes[profKey].includes(e.start)
       );
+
+      // Renderizar eventos del servidor
       visibleServer.forEach((evento) => {
         const startDate = new Date(evento.start);
         const diaSemana = startDate.getDay();
@@ -334,6 +388,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       });
 
+      // Renderizar eventos pendientes (locales)
       pendingEvents[profKey].forEach((evento) => {
         const startDate = new Date(evento.start);
         const diaSemana = startDate.getDay();
@@ -354,12 +409,9 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
-  const pendingDeletes = {
-    elio: [],
-    manuel: [],
-    jimy: [],
-    fernando: [],
-  };
+  // ==========================================
+  // MANEJAR CLICK EN SLOT
+  // ==========================================
 
   function manejarClickSlot(event) {
     const td = event.currentTarget;
@@ -369,6 +421,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (horaInicio === "12:00") return;
 
+    // MODO BORRADO
     if (modoBorradoActivo) {
       if (
         td.classList.contains("ocupado") &&
@@ -406,6 +459,7 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
 
+    // MODO AGREGAR
     if (!seleccionado) {
       profesionalSelect.classList.add("highlight");
       setTimeout(() => profesionalSelect.classList.remove("highlight"), 1500);
@@ -447,13 +501,21 @@ document.addEventListener("DOMContentLoaded", function () {
     td.dataset.turnoInicio = startISO;
     td.dataset.origen = "local";
 
-    console.log("Slot agregado:", nuevo);
+    console.log("✅ Slot agregado:", nuevo);
   }
+
+  // ==========================================
+  // MODO BORRADO
+  // ==========================================
 
   btnModoBorrar.addEventListener("click", () => {
     modoBorradoActivo = !modoBorradoActivo;
     btnModoBorrar.classList.toggle("active", modoBorradoActivo);
   });
+
+  // ==========================================
+  // CARGAR TURNOS INICIAL DESDE PostgreSQL
+  // ==========================================
 
   function cargarTurnosInicial() {
     const now = Date.now();
@@ -463,18 +525,19 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     setLoading(btnGuardar, true);
-    fetch("/obtener-turnos")
+    fetch(`${API_URL}/obtener-turnos`)
       .then((response) => {
-        if (!response.ok) throw new Error("No se pudo cargar turnos");
+        if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
         return response.json();
       })
       .then((grupos) => {
         cacheGlobal = grupos;
         cacheTimestampGlobal = now;
         procesarTurnosGlobal(grupos);
+        console.log("✅ Turnos iniciales cargados desde PostgreSQL");
       })
       .catch((err) => {
-        console.error("Error leyendo turnos:", err);
+        console.error("❌ Error leyendo turnos:", err);
         generarTabla();
         mostrarMensaje("Error al cargar turnos iniciales.", "error");
       })
@@ -518,13 +581,21 @@ document.addEventListener("DOMContentLoaded", function () {
     if (seleccionado) {
       actualizarSlots(seleccionado);
     }
-    console.log("📅 Turnos cargados:", grupos.length, "grupos");
+    console.log("📅 Turnos procesados:", grupos.length, "grupos");
   }
+
+  // ==========================================
+  // CAMBIO DE PROFESIONAL
+  // ==========================================
 
   profesionalSelect.addEventListener("change", () => {
     const seleccionado = profesionalSelect.value;
     actualizarSlots(seleccionado);
   });
+
+  // ==========================================
+  // GUARDAR TURNOS EN PostgreSQL
+  // ==========================================
 
   btnGuardar.addEventListener("click", async () => {
     setLoading(btnGuardar, true);
@@ -554,7 +625,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }));
       });
 
-      const res = await fetch("/guardar-turno", {
+      const res = await fetch(`${API_URL}/guardar-turno`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(turnosObj),
@@ -563,27 +634,38 @@ document.addEventListener("DOMContentLoaded", function () {
       const data = await res.json();
       if (res.ok) {
         mostrarMensaje(
-          data.message || "Turnos guardados exitosamente.",
+          data.message || "Turnos guardados exitosamente en PostgreSQL.",
           "success"
         );
+
+        // Limpiar pendientes
         Object.keys(pendingEvents).forEach((key) => (pendingEvents[key] = []));
         Object.keys(pendingDeletes).forEach(
           (key) => (pendingDeletes[key] = [])
         );
+
+        // Limpiar caché
         cacheGlobal = null;
         Object.keys(cacheTurnos).forEach((key) => (cacheTurnos[key] = null));
         Object.keys(serverEvents).forEach((key) => (serverEvents[key] = []));
+
+        // Recargar
         cargarTurnosInicial();
+        console.log("💾 Turnos guardados en PostgreSQL:", data);
       } else {
         mostrarMensaje(data.message || "Error al guardar.", "error");
       }
     } catch (err) {
-      console.error("Error al guardar turnos:", err);
+      console.error("❌ Error al guardar turnos:", err);
       mostrarMensaje("Error al guardar en el servidor.", "error");
     } finally {
       setLoading(btnGuardar, false);
     }
   });
+
+  // ==========================================
+  // BORRAR TODOS LOS TURNOS
+  // ==========================================
 
   btnBorrar.addEventListener("click", () => {
     const seleccionado = profesionalSelect.value;
@@ -614,6 +696,8 @@ document.addEventListener("DOMContentLoaded", function () {
     );
   });
 
+  console.log("🚀 Iniciando panel de turnos con PostgreSQL...");
+  console.log("🔗 API URL:", API_URL);
   generarTabla();
   cargarTurnosInicial();
 });
