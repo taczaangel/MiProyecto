@@ -4,12 +4,13 @@ const { Client, LocalAuth } = require("whatsapp-web.js");
 const qrcode = require("qrcode-terminal");
 const axios = require("axios");
 
-const TURNOS_FILE = path.join(__dirname, "turnos.json");
 const CITAS_FILE = path.join(__dirname, "citas.json");
 const ADMIN_PHONE = "51959634347@c.us";
 const SERVER_URL = process.env.SERVER_URL || "http://localhost:3000";
 
 const BOT_START_TS = Math.floor(Date.now() / 1000);
+
+console.log(`🔗 Bot configurado para usar servidor: ${SERVER_URL}`);
 
 function getCurrentPeruTime() {
   const now = new Date();
@@ -105,110 +106,161 @@ function detectProfDisplayFromKey(k) {
   return display[k] || k;
 }
 
+// ✅ FUNCIÓN ACTUALIZADA: Ahora obtiene turnos desde el servidor
 async function fetchTurnosFromServer(especialidad = null) {
   try {
     const url = `${SERVER_URL}/obtener-turnos${
       especialidad ? `?especialidad=${especialidad}` : ""
     }`;
-    const res = await axios.get(url);
-    if (res.data && res.data.length > 0) {
+    
+    console.log(`🔍 Obteniendo turnos desde: ${url}`);
+    
+    const res = await axios.get(url, {
+      timeout: 10000, // 10 segundos de timeout
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'WhatsApp-Bot/1.0'
+      }
+    });
+    
+    console.log(`✅ Respuesta recibida del servidor. Turnos encontrados: ${res.data?.length || 0}`);
+    
+    if (res.data && Array.isArray(res.data) && res.data.length > 0) {
       const normalized = normalizeTurnos(res.data, especialidad);
       turnosCache = normalized;
+      console.log(`📦 TurnosCache actualizado con ${normalized.length} turnos`);
       return normalized;
     } else {
+      console.log("⚠️ No se encontraron turnos disponibles en el servidor");
       turnosCache = [];
       return [];
     }
   } catch (e) {
-    console.error("Error fetching turnos:", e);
+    console.error("❌ Error obteniendo turnos desde el servidor:", e.message);
+    if (e.response) {
+      console.error("Respuesta del servidor:", e.response.status, e.response.data);
+    }
     turnosCache = [];
     return [];
   }
 }
 
+// ✅ FUNCIÓN ACTUALIZADA: Normaliza los turnos recibidos del servidor
 function normalizeTurnos(raw, especialidad = null) {
   const out = [];
-  if (!raw) return out;
+  if (!raw || !Array.isArray(raw)) return out;
+  
   const now = new Date();
   now.setUTCHours(0, 0, 0, 0);
 
-  Object.values(raw || {}).forEach((group) => {
-    if (group && group.date && Array.isArray(group.slots)) {
-      const profRaw = (group.title || "").toString().toLowerCase();
-      const profKey = detectProfKeyFromString(profRaw);
-      const startDate = new Date(`${group.date}T00:00:00.000Z`);
-      if (!startDate || startDate < now) return;
-
-      group.slots.forEach((slot) => {
-        const startStr = `${group.date}T${slot.start}:00.000Z`;
-        const startDateSlot = new Date(startStr);
-        if (!startDateSlot || startDateSlot < now) return;
-        const endStr = `${group.date}T${slot.end}:00.000Z`;
-        const endDateSlot =
-          new Date(endStr) ||
-          new Date(startDateSlot.getTime() + 40 * 60 * 1000);
-        const esp =
-          group.especialidad ||
-          (profKey === "jimy" || profKey === "fernando"
-            ? "pediatria"
-            : "general");
-
-        if (especialidad && esp !== especialidad) return;
-
-        const fh = formatFechaHora(startDateSlot.toISOString());
-        out.push({
-          profKey,
-          profTitle: group.title || detectProfDisplayFromKey(profKey),
-          startISO: startDateSlot.toISOString(),
-          endISO: endDateSlot.toISOString(),
-          startTime: startDateSlot.getTime(),
-          endTime: endDateSlot.getTime(),
-          fecha: fh.fecha,
-          hora: fh.hora,
-          especialidad: esp,
-          original: { ...group, slot },
-        });
-      });
+  raw.forEach((turno) => {
+    if (!turno || !turno.fecha || !turno.hora_inicio) {
+      console.log("⚠️ Turno inválido ignorado:", turno);
+      return;
     }
+
+    // Detectar profesional
+    const profRaw = (turno.profesional || turno.title || "").toString().toLowerCase();
+    const profKey = detectProfKeyFromString(profRaw);
+    
+    // Construir fecha y hora en formato ISO
+    const startStr = `${turno.fecha}T${turno.hora_inicio}:00.000Z`;
+    const startDateSlot = new Date(startStr);
+    
+    if (!startDateSlot || isNaN(startDateSlot.getTime()) || startDateSlot < now) {
+      console.log("⚠️ Fecha inválida o pasada:", startStr);
+      return;
+    }
+
+    const endStr = turno.hora_fin 
+      ? `${turno.fecha}T${turno.hora_fin}:00.000Z`
+      : new Date(startDateSlot.getTime() + 40 * 60 * 1000).toISOString();
+    
+    const endDateSlot = new Date(endStr);
+    
+    // Determinar especialidad
+    const esp = turno.especialidad || 
+      (profKey === "jimy" || profKey === "fernando" ? "pediatria" : "general");
+
+    // Filtrar por especialidad si se especifica
+    if (especialidad && esp !== especialidad) return;
+
+    const fh = formatFechaHora(startDateSlot.toISOString());
+    
+    out.push({
+      profKey,
+      profTitle: turno.profesional || turno.title || detectProfDisplayFromKey(profKey),
+      startISO: startDateSlot.toISOString(),
+      endISO: endDateSlot.toISOString(),
+      startTime: startDateSlot.getTime(),
+      endTime: endDateSlot.getTime(),
+      fecha: fh.fecha,
+      hora: fh.hora,
+      especialidad: esp,
+      original: turno,
+    });
   });
 
   out.sort((a, b) => a.startTime - b.startTime);
+  console.log(`✅ ${out.length} turnos normalizados correctamente`);
   return out;
 }
 
 async function removeSlotFromServer(profKey, startISO, profTitle) {
   try {
+    console.log(`🔒 Reservando turno: ${profTitle} - ${startISO}`);
+    
     const res = await axios.post(`${SERVER_URL}/reservar-turno`, {
       profesional: profTitle,
       turnoInicio: startISO,
+    }, {
+      timeout: 10000,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      }
     });
+    
     if (res.data.message && res.data.message.includes("correctamente")) {
+      console.log("✅ Turno reservado exitosamente");
       return true;
     } else {
+      console.log("⚠️ Respuesta inesperada al reservar:", res.data);
       return false;
     }
   } catch (e) {
-    console.error("Error reservando turno:", e);
+    console.error("❌ Error reservando turno:", e.message);
     return false;
   }
 }
 
 async function addSlotBackToServer(profKey, startISO, endISO, profTitle, esp) {
   try {
+    console.log(`🔓 Liberando turno: ${profTitle} - ${startISO}`);
+    
     const res = await axios.post(`${SERVER_URL}/liberar-turno`, {
       profesional: profTitle,
       turnoInicio: startISO,
       turnoFin: endISO,
       title: profTitle,
       especialidad: esp,
+    }, {
+      timeout: 10000,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      }
     });
+    
     if (res.data.message && res.data.message.includes("correctamente")) {
+      console.log("✅ Turno liberado exitosamente");
       return true;
     } else {
+      console.log("⚠️ Respuesta inesperada al liberar:", res.data);
       return false;
     }
   } catch (e) {
-    console.error("Error liberando turno:", e);
+    console.error("❌ Error liberando turno:", e.message);
     return false;
   }
 }
@@ -667,7 +719,7 @@ function buildDoctorSelectionMessage(especialidad, includeManuel = false) {
         "¿Llevas tratamiento con algún odontólogo? 🤔\n\nSi es así, escribe el número correspondiente:\n\n";
 
       if (doctors.available.includes("elio")) {
-        message += `*${optionNumber}* - CD Elio Támara\n`;
+        message +=`*${optionNumber}* - CD Elio Támara\n`;
         optionNumber++;
       }
 
@@ -714,7 +766,12 @@ client.on("qr", (qr) => qrcode.generate(qr, { small: true }));
 
 client.on("ready", async () => {
   console.log("🤖 Bot listo y conectado a WhatsApp");
+  console.log(`🔗 Usando servidor: ${SERVER_URL}`);
+  
+  // ✅ Cargar turnos inicialmente desde el servidor
   await fetchTurnosFromServer();
+  
+  // ✅ Polling cada 30 segundos para mantener turnos actualizados
   pollingInterval = setInterval(async () => {
     await fetchTurnosFromServer();
   }, 30000);
@@ -985,7 +1042,6 @@ client.on("message", async (msg) => {
     if (state.step === 3.5) {
       const text = raw.trim();
 
-      // Si dice NO cuando solo hay un doctor
       if (isDeny(text)) {
         await fetchTurnosFromServer("pediatria");
         const doctorsPediatria = getAvailableDoctors("pediatria");
@@ -1784,3 +1840,5 @@ if (require.main === module) {
   client.initialize();
   console.log("🤖 BOT INICIANDO...");
 }
+
+module.exports = client;
