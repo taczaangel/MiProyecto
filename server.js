@@ -465,6 +465,234 @@ async function initDB() {
   }
 }
 
+// ✅ AGREGAR ESTOS 3 ENDPOINTS AL FINAL DE server.js (ANTES DE app.listen)
+
+// ========================================
+// ENDPOINTS PARA CITAS (USADOS POR EL BOT)
+// ========================================
+
+// POST /guardar-cita - Guardar cita en PostgreSQL
+app.post("/guardar-cita", async (req, res) => {
+  try {
+    const {
+      nombre,
+      dni,
+      edad,
+      consultorio,
+      profesional,
+      fecha,
+      hora,
+      chatId,
+      status,
+    } = req.body;
+
+    if (!nombre || !dni || !profesional || !fecha || !hora) {
+      return res.status(400).json({
+        error: "Datos incompletos",
+        requerido: "nombre, dni, profesional, fecha, hora",
+      });
+    }
+
+    // Convertir fecha y hora a ISO para start_utc
+    const fechaISO = parseFechaLocal(fecha);
+    const horaLimpia = limpiarHora(hora);
+    const localDateTime = `${fechaISO}T${horaLimpia}:00.000`;
+    const startUTC = new Date(localDateTime).toISOString();
+
+    const result = await pool.query(
+      `INSERT INTO citas 
+      (nombre, dni, edad, consultorio, profesional, fecha, hora, chat_id, status, confirmed_at, start_utc)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10)
+      RETURNING *`,
+      [
+        nombre,
+        dni,
+        edad,
+        consultorio,
+        profesional,
+        fecha,
+        hora,
+        chatId,
+        status || "confirmada",
+        startUTC,
+      ]
+    );
+
+    console.log(`💾 Cita guardada: ${nombre} (DNI: ${dni}) - ${fecha} ${hora}`);
+    res.json({
+      message: "Cita guardada correctamente",
+      cita: result.rows[0],
+    });
+  } catch (error) {
+    console.error("❌ Error guardando cita:", error);
+    res.status(500).json({ error: "Error al guardar cita" });
+  }
+});
+
+// GET /buscar-cita/:dni - Buscar cita por DNI
+app.get("/buscar-cita/:dni", async (req, res) => {
+  try {
+    const { dni } = req.params;
+
+    if (!dni || dni.length !== 8) {
+      return res
+        .status(400)
+        .json({ error: "DNI inválido (debe tener 8 dígitos)" });
+    }
+
+    const result = await pool.query(
+      `SELECT id, nombre, dni, edad, consultorio, profesional, fecha, hora, 
+              chat_id as "chatId", status, confirmed_at as "confirmedAt", 
+              start_utc as "startUTC", cancelled_at as "cancelledAt"
+       FROM citas 
+       WHERE dni = $1 AND status != 'cancelada' 
+       ORDER BY confirmed_at DESC 
+       LIMIT 1`,
+      [dni]
+    );
+
+    if (result.rows.length === 0) {
+      return res
+        .status(404)
+        .json({ error: "No se encontró cita activa con este DNI" });
+    }
+
+    console.log(
+      `🔍 Cita encontrada: DNI ${dni} - ${result.rows[0].profesional}`
+    );
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("❌ Error buscando cita:", error);
+    res.status(500).json({ error: "Error al buscar cita" });
+  }
+});
+
+// POST /cancelar-cita - Cancelar cita por DNI
+app.post("/cancelar-cita", async (req, res) => {
+  try {
+    const { dni } = req.body;
+
+    if (!dni || dni.length !== 8) {
+      return res
+        .status(400)
+        .json({ error: "DNI inválido (debe tener 8 dígitos)" });
+    }
+
+    const result = await pool.query(
+      `UPDATE citas 
+       SET status = 'cancelada', cancelled_at = NOW() 
+       WHERE dni = $1 AND status != 'cancelada'
+       RETURNING *`,
+      [dni]
+    );
+
+    if (result.rows.length === 0) {
+      return res
+        .status(404)
+        .json({ error: "No se encontró cita activa para cancelar" });
+    }
+
+    console.log(
+      `❌ Cita cancelada: DNI ${dni} - ${result.rows[0].profesional}`
+    );
+    res.json({
+      message: "Cita cancelada correctamente",
+      cita: result.rows[0],
+    });
+  } catch (error) {
+    console.error("❌ Error cancelando cita:", error);
+    res.status(500).json({ error: "Error al cancelar cita" });
+  }
+});
+
+// ========================================
+// FUNCIONES AUXILIARES
+// ========================================
+
+function parseFechaLocal(fechaStr) {
+  if (!fechaStr || typeof fechaStr !== "string") return null;
+
+  // Formato: DD/MM/YYYY
+  const parts = fechaStr.split("/");
+  if (parts.length === 3) {
+    const [dd, mm, yyyy] = parts;
+    return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
+  }
+
+  return null;
+}
+
+function limpiarHora(horaStr) {
+  if (!horaStr) return "";
+
+  // Remover "a. m." y "p. m." y espacios extras
+  return horaStr
+    .replace(/ a\. m\./i, "")
+    .replace(/ p\. m\./i, "")
+    .trim()
+    .split(" ")[0];
+}
+
+// GET /obtener-turnos-bot - Formato para el bot de WhatsApp
+app.get("/obtener-turnos-bot", async (req, res) => {
+  try {
+    const especialidad = req.query.especialidad;
+    const now = new Date();
+    now.setUTCHours(0, 0, 0, 0);
+
+    let query = `
+      SELECT profesional, title, start_time, end_time, especialidad
+      FROM turnos 
+      WHERE start_time >= $1 
+      AND (held_by IS NULL OR held_until < NOW())
+    `;
+    const params = [now];
+
+    if (especialidad) {
+      query += ` AND especialidad = $2`;
+      params.push(especialidad);
+    }
+
+    query += ` ORDER BY start_time ASC`;
+
+    const result = await pool.query(query, params);
+
+    // Formato individual para el bot
+    const turnos = result.rows.map((t) => {
+      const startDate = new Date(t.start_time);
+      const endDate = new Date(t.end_time);
+
+      return {
+        profesional: t.profesional,
+        title: t.title,
+        fecha: startDate.toISOString().split("T")[0],
+        hora_inicio: `${startDate
+          .getUTCHours()
+          .toString()
+          .padStart(2, "0")}:${startDate
+          .getUTCMinutes()
+          .toString()
+          .padStart(2, "0")}`,
+        hora_fin: `${endDate
+          .getUTCHours()
+          .toString()
+          .padStart(2, "0")}:${endDate
+          .getUTCMinutes()
+          .toString()
+          .padStart(2, "0")}`,
+        especialidad: t.especialidad,
+      };
+    });
+
+    console.log(`🤖 Turnos para bot: ${turnos.length}`);
+    res.json(turnos);
+  } catch (error) {
+    console.error("Error obteniendo turnos para bot:", error);
+    res.status(500).json({ message: "Error al obtener turnos" });
+  }
+});
+
+// ✅ AHORA SÍ: app.listen DEBE IR AL FINAL
 app.listen(PORT, async () => {
   await initDB();
   console.log(`✅ Servidor corriendo en http://localhost:${PORT}`);

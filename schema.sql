@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS citas (
   chat_id VARCHAR(100) NOT NULL,
   status VARCHAR(50) DEFAULT 'pendiente',
   confirmed_at TIMESTAMPTZ,
+  cancelled_at TIMESTAMPTZ,  -- ✅ AGREGAR ESTA LÍNEA
   start_utc TIMESTAMPTZ NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );

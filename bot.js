@@ -109,22 +109,26 @@ function detectProfDisplayFromKey(k) {
 // ✅ FUNCIÓN ACTUALIZADA: Ahora obtiene turnos desde el servidor
 async function fetchTurnosFromServer(especialidad = null) {
   try {
-    const url = `${SERVER_URL}/obtener-turnos${
+    const url = `${SERVER_URL}/obtener-turnos-bot${
       especialidad ? `?especialidad=${especialidad}` : ""
     }`;
-    
+
     console.log(`🔍 Obteniendo turnos desde: ${url}`);
-    
+
     const res = await axios.get(url, {
       timeout: 10000, // 10 segundos de timeout
       headers: {
-        'Accept': 'application/json',
-        'User-Agent': 'WhatsApp-Bot/1.0'
-      }
+        Accept: "application/json",
+        "User-Agent": "WhatsApp-Bot/1.0",
+      },
     });
-    
-    console.log(`✅ Respuesta recibida del servidor. Turnos encontrados: ${res.data?.length || 0}`);
-    
+
+    console.log(
+      `✅ Respuesta recibida del servidor. Turnos encontrados: ${
+        res.data?.length || 0
+      }`
+    );
+
     if (res.data && Array.isArray(res.data) && res.data.length > 0) {
       const normalized = normalizeTurnos(res.data, especialidad);
       turnosCache = normalized;
@@ -138,7 +142,11 @@ async function fetchTurnosFromServer(especialidad = null) {
   } catch (e) {
     console.error("❌ Error obteniendo turnos desde el servidor:", e.message);
     if (e.response) {
-      console.error("Respuesta del servidor:", e.response.status, e.response.data);
+      console.error(
+        "Respuesta del servidor:",
+        e.response.status,
+        e.response.data
+      );
     }
     turnosCache = [];
     return [];
@@ -149,7 +157,7 @@ async function fetchTurnosFromServer(especialidad = null) {
 function normalizeTurnos(raw, especialidad = null) {
   const out = [];
   if (!raw || !Array.isArray(raw)) return out;
-  
+
   const now = new Date();
   now.setUTCHours(0, 0, 0, 0);
 
@@ -160,36 +168,44 @@ function normalizeTurnos(raw, especialidad = null) {
     }
 
     // Detectar profesional
-    const profRaw = (turno.profesional || turno.title || "").toString().toLowerCase();
+    const profRaw = (turno.profesional || turno.title || "")
+      .toString()
+      .toLowerCase();
     const profKey = detectProfKeyFromString(profRaw);
-    
+
     // Construir fecha y hora en formato ISO
     const startStr = `${turno.fecha}T${turno.hora_inicio}:00.000Z`;
     const startDateSlot = new Date(startStr);
-    
-    if (!startDateSlot || isNaN(startDateSlot.getTime()) || startDateSlot < now) {
+
+    if (
+      !startDateSlot ||
+      isNaN(startDateSlot.getTime()) ||
+      startDateSlot < now
+    ) {
       console.log("⚠️ Fecha inválida o pasada:", startStr);
       return;
     }
 
-    const endStr = turno.hora_fin 
+    const endStr = turno.hora_fin
       ? `${turno.fecha}T${turno.hora_fin}:00.000Z`
       : new Date(startDateSlot.getTime() + 40 * 60 * 1000).toISOString();
-    
+
     const endDateSlot = new Date(endStr);
-    
+
     // Determinar especialidad
-    const esp = turno.especialidad || 
+    const esp =
+      turno.especialidad ||
       (profKey === "jimy" || profKey === "fernando" ? "pediatria" : "general");
 
     // Filtrar por especialidad si se especifica
     if (especialidad && esp !== especialidad) return;
 
     const fh = formatFechaHora(startDateSlot.toISOString());
-    
+
     out.push({
       profKey,
-      profTitle: turno.profesional || turno.title || detectProfDisplayFromKey(profKey),
+      profTitle:
+        turno.profesional || turno.title || detectProfDisplayFromKey(profKey),
       startISO: startDateSlot.toISOString(),
       endISO: endDateSlot.toISOString(),
       startTime: startDateSlot.getTime(),
@@ -209,18 +225,22 @@ function normalizeTurnos(raw, especialidad = null) {
 async function removeSlotFromServer(profKey, startISO, profTitle) {
   try {
     console.log(`🔒 Reservando turno: ${profTitle} - ${startISO}`);
-    
-    const res = await axios.post(`${SERVER_URL}/reservar-turno`, {
-      profesional: profTitle,
-      turnoInicio: startISO,
-    }, {
-      timeout: 10000,
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
+
+    const res = await axios.post(
+      `${SERVER_URL}/reservar-turno`,
+      {
+        profesional: profTitle,
+        turnoInicio: startISO,
+      },
+      {
+        timeout: 10000,
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
       }
-    });
-    
+    );
+
     if (res.data.message && res.data.message.includes("correctamente")) {
       console.log("✅ Turno reservado exitosamente");
       return true;
@@ -237,21 +257,25 @@ async function removeSlotFromServer(profKey, startISO, profTitle) {
 async function addSlotBackToServer(profKey, startISO, endISO, profTitle, esp) {
   try {
     console.log(`🔓 Liberando turno: ${profTitle} - ${startISO}`);
-    
-    const res = await axios.post(`${SERVER_URL}/liberar-turno`, {
-      profesional: profTitle,
-      turnoInicio: startISO,
-      turnoFin: endISO,
-      title: profTitle,
-      especialidad: esp,
-    }, {
-      timeout: 10000,
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
+
+    const res = await axios.post(
+      `${SERVER_URL}/liberar-turno`,
+      {
+        profesional: profTitle,
+        turnoInicio: startISO,
+        turnoFin: endISO,
+        title: profTitle,
+        especialidad: esp,
+      },
+      {
+        timeout: 10000,
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
       }
-    });
-    
+    );
+
     if (res.data.message && res.data.message.includes("correctamente")) {
       console.log("✅ Turno liberado exitosamente");
       return true;
@@ -319,35 +343,112 @@ function limpiarHora(horaStr) {
     .split(" ")[0];
 }
 
-function appendCitaRecord(record) {
+// ✅ NUEVA: Guardar cita en PostgreSQL
+async function appendCitaRecord(record) {
   try {
-    const fechaISO = parseFechaLocal(record.fecha);
-    if (!fechaISO)
-      throw new Error(`Formato de fecha inválido: ${record.fecha}`);
-    const horaLimpia = limpiarHora(record.hora);
-    if (!horaLimpia || !horaLimpia.includes(":"))
-      throw new Error(`Formato de hora inválido: ${record.hora}`);
-    const localDateTime = `${fechaISO}T${horaLimpia}:00.000`;
-    const startUTC = new Date(localDateTime).toISOString();
+    console.log(`💾 Guardando cita en PostgreSQL:`, record);
 
-    let arr = readJsonFileSafe(CITAS_FILE, true);
-    arr.push({
-      ...record,
-      confirmedAt: new Date().toISOString(),
-      startUTC,
-    });
-    const success = writeJsonFileSafe(CITAS_FILE, arr);
-    if (!success) throw new Error("Error al escribir citas.json");
-    return true;
+    const res = await axios.post(
+      `${SERVER_URL}/guardar-cita`,
+      {
+        nombre: record.nombre,
+        dni: record.dni,
+        edad: record.edad,
+        consultorio: record.consultorio,
+        profesional: record.profesional,
+        fecha: record.fecha,
+        hora: record.hora,
+        chatId: record.chatId,
+        status: record.status || "confirmada",
+      },
+      {
+        timeout: 10000,
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+      }
+    );
+
+    if (
+      res.data &&
+      res.data.message &&
+      res.data.message.includes("correctamente")
+    ) {
+      console.log("✅ Cita guardada en PostgreSQL");
+      return true;
+    }
+
+    console.error("⚠️ Respuesta inesperada al guardar cita:", res.data);
+    return false;
   } catch (err) {
-    console.error("Error en appendCitaRecord:", err);
+    console.error("❌ Error guardando cita en PostgreSQL:", err.message);
     return false;
   }
 }
 
-function findCitaByDni(dni) {
-  const citas = readJsonFileSafe(CITAS_FILE, true);
-  return citas.find((c) => c.dni === dni && c.status !== "cancelada");
+// ✅ NUEVA: Buscar cita en PostgreSQL
+async function findCitaByDni(dni) {
+  try {
+    console.log(`🔍 Buscando cita con DNI: ${dni}`);
+
+    const res = await axios.get(`${SERVER_URL}/buscar-cita/${dni}`, {
+      timeout: 10000,
+      headers: {
+        Accept: "application/json",
+      },
+    });
+
+    if (res.data && res.data.dni) {
+      console.log(`✅ Cita encontrada para DNI ${dni}`);
+      return res.data;
+    }
+
+    console.log(`ℹ️ No se encontró cita para DNI ${dni}`);
+    return null;
+  } catch (err) {
+    if (err.response && err.response.status === 404) {
+      console.log(`ℹ️ No hay cita para DNI ${dni}`);
+      return null;
+    }
+    console.error("❌ Error buscando cita:", err.message);
+    return null;
+  }
+}
+
+// ✅ NUEVA: Cancelar cita en PostgreSQL
+async function cancelCitaByDni(dni) {
+  try {
+    console.log(`❌ Cancelando cita con DNI: ${dni}`);
+
+    const res = await axios.post(
+      `${SERVER_URL}/cancelar-cita`,
+      {
+        dni: dni,
+      },
+      {
+        timeout: 10000,
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+      }
+    );
+
+    if (
+      res.data &&
+      res.data.message &&
+      res.data.message.includes("correctamente")
+    ) {
+      console.log("✅ Cita cancelada en PostgreSQL");
+      return true;
+    }
+
+    return false;
+  } catch (err) {
+    console.error("❌ Error cancelando cita:", err.message);
+    return false;
+  }
 }
 
 async function sendToAdmin(client, citaData, chatId) {
@@ -719,7 +820,7 @@ function buildDoctorSelectionMessage(especialidad, includeManuel = false) {
         "¿Llevas tratamiento con algún odontólogo? 🤔\n\nSi es así, escribe el número correspondiente:\n\n";
 
       if (doctors.available.includes("elio")) {
-        message +=`*${optionNumber}* - CD Elio Támara\n`;
+        message += `*${optionNumber}* - CD Elio Támara\n`;
         optionNumber++;
       }
 
@@ -767,10 +868,10 @@ client.on("qr", (qr) => qrcode.generate(qr, { small: true }));
 client.on("ready", async () => {
   console.log("🤖 Bot listo y conectado a WhatsApp");
   console.log(`🔗 Usando servidor: ${SERVER_URL}`);
-  
+
   // ✅ Cargar turnos inicialmente desde el servidor
   await fetchTurnosFromServer();
-  
+
   // ✅ Polling cada 30 segundos para mantener turnos actualizados
   pollingInterval = setInterval(async () => {
     await fetchTurnosFromServer();
@@ -940,7 +1041,7 @@ client.on("message", async (msg) => {
       }
 
       const dniDigits = raw.replace(/\D/g, "");
-      const existingCita = findCitaByDni(dniDigits);
+      const existingCita = await findCitaByDni(dniDigits);
       if (existingCita) {
         await client.sendMessage(
           chatId,
@@ -1694,7 +1795,7 @@ client.on("message", async (msg) => {
     }
 
     if (state.step === 6) {
-      const existingCita = findCitaByDni(state.data.dni);
+      const existingCita = await findCitaByDni(state.data.dni);
       if (!existingCita) {
         await client.sendMessage(
           chatId,
@@ -1730,15 +1831,8 @@ client.on("message", async (msg) => {
         oldEsp
       );
       if (addedBack) {
-        const citas = readJsonFileSafe(CITAS_FILE, true);
-        const citaIdx = citas.findIndex(
-          (c) => c.dni === state.data.dni && c.status !== "cancelada"
-        );
-        if (citaIdx !== -1) {
-          citas[citaIdx].status = "cancelada";
-          citas[citaIdx].cancelledAt = new Date().toISOString();
-          writeJsonFileSafe(CITAS_FILE, citas);
-        }
+        // ✅ NUEVA LÍNEA: Cancelar en PostgreSQL
+        await cancelCitaByDni(state.data.dni);
         await client.sendMessage(
           chatId,
           `✅ Cita anterior *cancelada exitosamente*.\n\n🔍 Buscando nuevo turno para *${
